@@ -1,0 +1,5 @@
+{
+  "name": "Xevar",
+  "description": "A multi-chain crypto portfolio tracking dashboard that allows users to paste wallet addresses and instantly view their entire crypto holdings across blockchains.",
+  "requestFramePermissions": []
+}
