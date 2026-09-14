@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Wordmark } from '@/components/brand/Logo';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { usePrefsStore, type Currency } from '@/store/usePrefsStore';
-import { FeedIndicator } from './FeedIndicator';
+import { ThemeToggle } from './ThemeToggle';
 
 const CURRENCIES = [
   { value: 'USD' as Currency, label: '$' , title: 'US Dollar' },
@@ -45,7 +45,7 @@ export function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </button>
 
       <div className="ml-auto flex items-center gap-2">
-        <FeedIndicator className="hidden sm:inline-flex" />
+        <ThemeToggle className="hidden sm:inline-flex" />
         <SegmentedControl
           options={CURRENCIES}
           value={currency}

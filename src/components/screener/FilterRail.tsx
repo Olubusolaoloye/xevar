@@ -6,7 +6,6 @@ import { activeFilterCount } from '@/data/query';
 import { useScreenerStore } from '@/store/useScreenerStore';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Toggle } from '@/components/ui/Toggle';
 import type { ScreenerFilters, ScreenerQuery } from '@/data/types';
 
 /** Thresholds offered as one-tap choices rather than free-text entry. */
@@ -189,19 +188,10 @@ export function FilterRail({ query, className }: { query: ScreenerQuery; classNa
         </div>
       </Section>
 
-      <Section title="Safety">
-        <Toggle
-          checked={query.liquidityLockedOnly}
-          onChange={(value) => setFilter('liquidityLockedOnly', value)}
-          label="Liquidity locked only"
-          description="Hide pairs whose liquidity is neither locked nor burned."
-        />
-      </Section>
-
       <div className="px-4 py-3">
         <p className="text-[11px] leading-relaxed text-ink-dim">
-          Safety signals are automated heuristics, not an audit. Always verify a
-          contract yourself before trading it.
+          Contract verdicts come from an external provider, linked on each token
+          page. Always verify a contract yourself before trading it.
         </p>
       </div>
     </div>

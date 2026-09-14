@@ -113,11 +113,17 @@ export interface Pair {
     telegram?: string;
   };
 
-  /** Token logo from the provider, when it has one. */
+  /** Token logo — the operator's override, else the provider's. */
   imageUrl?: string;
+  /** Wide banner set by the operator. */
+  coverUrl?: string;
+  /** Operator-written description. */
+  blurb?: string;
+  /** Pinned to the top of the board. */
+  featured?: boolean;
 
   /**
-   * Which registry entry put this pair on the board.
+   * Which registry entry put this pair listed.
    *
    * `pinned` means the token was fetched by contract address and is certainly
    * the right asset. False means it was matched by ticker alone, which can

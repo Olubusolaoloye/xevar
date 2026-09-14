@@ -8,6 +8,8 @@ import { Portfolio } from '@/pages/Portfolio';
 import { Alerts } from '@/pages/Alerts';
 import { Settings } from '@/pages/Settings';
 import { Admin } from '@/pages/Admin';
+import { Section } from '@/pages/Section';
+import { MultiChart } from '@/pages/MultiChart';
 import { NotFound } from '@/pages/NotFound';
 
 export default function App() {
@@ -27,6 +29,8 @@ export default function App() {
           <Route path="watchlist" element={<Watchlist />} />
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="alerts" element={<Alerts />} />
+          <Route path="sections/:sectionId" element={<Section />} />
+          <Route path="multichart" element={<MultiChart />} />
           <Route path="admin" element={<Admin />} />
           <Route path="settings" element={<Settings />} />
           <Route path="404" element={<NotFound />} />

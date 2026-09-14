@@ -5,9 +5,9 @@ import { CHAIN_LIST } from '@/data/chains';
 import { useTokenSearch } from '@/hooks/useTokenSearch';
 import {
   CATEGORY_LABEL,
-  useRegistryStore,
+  useListingStore,
   type TokenCategory,
-} from '@/store/useRegistryStore';
+} from '@/store/useListingStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ChainChip } from '@/components/ui/ChainChip';
@@ -27,7 +27,7 @@ const CATEGORIES = Object.keys(CATEGORY_LABEL) as TokenCategory[];
  * specific asset that cannot later resolve to an impostor.
  */
 export function AddTokenPanel() {
-  const add = useRegistryStore((s) => s.add);
+  const add = useListingStore((s) => s.add);
 
   const [query, setQuery] = useState('');
   const [chain, setChain] = useState<ChainId | ''>('');
@@ -64,7 +64,7 @@ export function AddTokenPanel() {
   return (
     <div>
       <PanelHeader
-        title="Add a token"
+        title="List a token"
         subtitle="Search live markets and pick the real contract"
         icon={<Plus className="h-4 w-4" />}
       />
@@ -183,7 +183,7 @@ export function AddTokenPanel() {
                       Added
                     </>
                   ) : (
-                    'Track'
+                    'List'
                   )}
                 </Button>
               </li>
@@ -194,7 +194,7 @@ export function AddTokenPanel() {
         <p className="flex items-start gap-2 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-dim">
           <ShieldAlert className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
           Anyone can deploy a token with any ticker. Check the contract address
-          and liquidity against a source you trust before tracking it. Entries
+          and liquidity against a source you trust before listing it. Entries
           marked “unverified” were matched by ticker alone and could resolve to
           a different token.
         </p>

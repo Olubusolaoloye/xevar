@@ -1,7 +1,7 @@
 import { Panel } from '@/components/ui/Panel';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AddTokenPanel } from '@/components/admin/AddTokenPanel';
-import { TrackedTokenList } from '@/components/admin/TrackedTokenList';
+import { ListingList } from '@/components/admin/ListingList';
 import { FeedDiagnostics } from '@/components/admin/FeedDiagnostics';
 import { AdminGate } from '@/components/admin/AdminGate';
 import { SlideManager } from '@/components/admin/SlideManager';
@@ -29,7 +29,7 @@ function AdminScreen() {
       <PageHeader
         eyebrow="Manage"
         title="Admin"
-        description="Choose which tokens appear on the board, and check where their prices are coming from."
+        description="Choose which tokens appear listed, and check where their prices are coming from."
       />
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -39,7 +39,7 @@ function AdminScreen() {
           </Panel>
 
           <Panel className="overflow-hidden">
-            <TrackedTokenList />
+            <ListingList />
           </Panel>
 
           <Panel className="overflow-hidden">

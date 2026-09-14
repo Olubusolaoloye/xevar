@@ -12,7 +12,7 @@ export const CATEGORY_LABEL: Record<TokenCategory, string> = {
   other: 'Other',
 };
 
-export interface TrackedToken {
+export interface Listing {
   id: string;
   chain: ChainId;
   /**
@@ -31,8 +31,27 @@ export interface TrackedToken {
    * pool is used, which is the one worth quoting.
    */
   pairAddress?: string;
+
+  /* --- Manual presentation overrides -------------------------------------
+     Anything set here wins over what the market provider reports. Providers
+     get token metadata wrong often enough — missing logos, truncated names,
+     placeholder descriptions — that an operator needs the final say on how a
+     listing is presented. Prices are never overridable: those come from the
+     pool and inventing them would be fabrication. */
+
+  /** Replaces the provider's logo. */
+  logoUrl?: string;
+  /** Wide banner shown on the token page. */
+  coverUrl?: string;
+  /** Short description shown on the token page. */
+  blurb?: string;
+  website?: string;
+  twitter?: string;
+  telegram?: string;
+  /** Pinned to the top of the board regardless of sort. */
+  featured?: boolean;
   addedAt: number;
-  /** Manual sort position on the board. */
+  /** Manual sort position listed. */
   order: number;
 }
 
@@ -44,7 +63,7 @@ export interface TrackedToken {
  * even within chains. The UI flags these so nobody mistakes a lookalike for
  * the real thing.
  */
-export function isPinned(token: TrackedToken): boolean {
+export function isPinned(token: Listing): boolean {
   return Boolean(token.address);
 }
 
@@ -60,12 +79,12 @@ export function isPinned(token: TrackedToken): boolean {
  * and are flagged as unverified until an address is pinned from the admin
  * screen, where the real pair can be picked from live search results.
  */
-const SEED: Array<Omit<TrackedToken, 'id' | 'addedAt' | 'order'>> = [
+const SEED: Array<Omit<Listing, 'id' | 'addedAt' | 'order'>> = [
   { chain: 'bsc', symbol: 'WKC', label: 'Wiki Cat', category: 'meme' },
   { chain: 'ethereum', symbol: 'BLIN', label: 'Blin', category: 'meme' },
 ];
 
-function seedTokens(): TrackedToken[] {
+function seedTokens(): Listing[] {
   return SEED.map((token, i) => ({
     ...token,
     id: `t${i}-${token.chain}-${token.symbol.toLowerCase()}`,
@@ -74,17 +93,17 @@ function seedTokens(): TrackedToken[] {
   }));
 }
 
-interface RegistryState {
-  tokens: TrackedToken[];
-  add: (token: Omit<TrackedToken, 'id' | 'addedAt' | 'order'>) => { ok: boolean; error?: string };
-  update: (id: string, patch: Partial<Omit<TrackedToken, 'id'>>) => void;
+interface ListingState {
+  tokens: Listing[];
+  add: (token: Omit<Listing, 'id' | 'addedAt' | 'order'>) => { ok: boolean; error?: string };
+  update: (id: string, patch: Partial<Omit<Listing, 'id'>>) => void;
   remove: (id: string) => void;
   move: (id: string, direction: -1 | 1) => void;
-  replaceAll: (tokens: TrackedToken[]) => void;
+  replaceAll: (tokens: Listing[]) => void;
   resetToSeed: () => void;
 }
 
-export const useRegistryStore = create<RegistryState>()(
+export const useListingStore = create<ListingState>()(
   persist(
     (set, get) => ({
       tokens: seedTokens(),
@@ -99,7 +118,7 @@ export const useRegistryStore = create<RegistryState>()(
             ? t.address.toLowerCase() === token.address.toLowerCase() && t.chain === token.chain
             : t.chain === token.chain && t.symbol.toUpperCase() === token.symbol.toUpperCase(),
         );
-        if (duplicate) return { ok: false, error: 'That token is already tracked on this chain.' };
+        if (duplicate) return { ok: false, error: 'That token is already listed on this chain.' };
         if (!token.symbol.trim()) return { ok: false, error: 'A ticker is required.' };
 
         set({
@@ -141,6 +160,6 @@ export const useRegistryStore = create<RegistryState>()(
 
       resetToSeed: () => set({ tokens: seedTokens() }),
     }),
-    { name: 'panscreener.registry' },
+    { name: 'panscreener.listings' },
   ),
 );

@@ -1,7 +1,7 @@
 /**
  * The market feed.
  *
- * DexScreener is the single source of price. Every figure on the board is the
+ * DexScreener is the single source of price. Every figure listed is the
  * real on-chain pool state for a pair the user chose to track.
  *
  * There used to be a Binance websocket overlaying centralised-exchange prices
@@ -24,7 +24,7 @@
 import { cached } from './cache';
 import { fetchTokenPairs, fetchTokensByAddress, searchPairs } from './sources/dexscreener';
 import { useAdminStore } from '@/store/useAdminStore';
-import { useRegistryStore, type TrackedToken } from '@/store/useRegistryStore';
+import { useListingStore, type Listing } from '@/store/useListingStore';
 import type { FeedStatus, Pair } from './types';
 
 /** Values younger than this are served straight from cache. */
@@ -36,7 +36,7 @@ const MAX_STALE_MS = 10 * 60_000;
 const ADDRESS_BATCH = 30;
 
 /** Pick the pool worth quoting: the pinned one, else the deepest. */
-function choosePool(candidates: Pair[], token: TrackedToken): Pair | null {
+function choosePool(candidates: Pair[], token: Listing): Pair | null {
   if (candidates.length === 0) return null;
 
   if (token.pairAddress) {
@@ -146,7 +146,7 @@ export class MarketFeed {
   }
 
   /**
-   * Assemble the board from the tracked-token registry.
+   * Assemble the board from the listings.
    *
    * Only tokens the user has chosen appear. That is the whole point of a
    * curated board — a search-assembled one returns whatever happens to match a
@@ -158,7 +158,7 @@ export class MarketFeed {
    * as unverified in the UI so it is never mistaken for a confirmed match.
    */
   private async loadBoard(): Promise<Pair[]> {
-    const tokens = [...useRegistryStore.getState().tokens].sort(
+    const tokens = [...useListingStore.getState().tokens].sort(
       (a, b) => a.order - b.order,
     );
     if (tokens.length === 0) return [];
@@ -174,7 +174,7 @@ export class MarketFeed {
       byChain.set(token.chain, bucket);
     }
 
-    const requests: Array<Promise<{ token?: TrackedToken; pairs: Pair[] }>> = [];
+    const requests: Array<Promise<{ token?: Listing; pairs: Pair[] }>> = [];
 
     for (const [chain, addresses] of byChain) {
       requests.push(
@@ -234,24 +234,38 @@ export class MarketFeed {
       const chosen = choosePool(candidates, token);
       if (!chosen) continue;
 
+      // Operator overrides win over provider metadata, field by field, so a
+      // blank override never wipes out something the provider did supply.
       board.push({
         ...chosen,
-        // The user's own label wins over whatever the provider calls it.
         baseToken: token.label
           ? { ...chosen.baseToken, name: token.label }
           : chosen.baseToken,
+        imageUrl: token.logoUrl || chosen.imageUrl,
+        coverUrl: token.coverUrl,
+        blurb: token.blurb,
+        featured: Boolean(token.featured),
+        socials: {
+          website: token.website || chosen.socials.website,
+          twitter: token.twitter || chosen.socials.twitter,
+          telegram: token.telegram || chosen.socials.telegram,
+        },
         tracked: { tokenId: token.id, pinned: Boolean(token.address) },
       });
     }
 
-    return board;
+    // Featured listings lead the board regardless of the active sort.
+    return [
+      ...board.filter((p) => p.featured),
+      ...board.filter((p) => !p.featured),
+    ];
   }
 
   /**
    * Nothing usable came back.
    *
    * The board is left empty rather than filled with generated tokens. Showing
-   * invented prices beside a user's real tracked tokens is exactly the
+   * invented prices beside a user's real listings is exactly the
    * confusion this product must not create — the UI says the feed is
    * unavailable instead.
    */

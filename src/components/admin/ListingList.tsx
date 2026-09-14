@@ -17,13 +17,14 @@ import { useMarketStore } from '@/store/useMarketStore';
 import {
   CATEGORY_LABEL,
   isPinned,
-  useRegistryStore,
+  useListingStore,
   type TokenCategory,
-  type TrackedToken,
-} from '@/store/useRegistryStore';
+  type Listing,
+} from '@/store/useListingStore';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Toggle } from '@/components/ui/Toggle';
 import { ChainChip } from '@/components/ui/ChainChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PanelHeader } from '@/components/ui/Panel';
@@ -33,47 +34,110 @@ import { Tooltip } from '@/components/ui/Tooltip';
 
 const CATEGORIES = Object.keys(CATEGORY_LABEL) as TokenCategory[];
 
-function EditRow({ token, onDone }: { token: TrackedToken; onDone: () => void }) {
-  const update = useRegistryStore((s) => s.update);
-  const [label, setLabel] = useState(token.label ?? '');
-  const [address, setAddress] = useState(token.address ?? '');
-  const [category, setCategory] = useState<TokenCategory>(token.category);
-  const [note, setNote] = useState(token.note ?? '');
+function Field({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+  mono,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-[11px] text-ink-mid">
+        {label} {hint && <span className="text-ink-dim">— {hint}</span>}
+      </label>
+      <Input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={mono ? 'font-mono text-xs' : undefined}
+      />
+    </div>
+  );
+}
+
+/**
+ * Full manual control over one listing.
+ *
+ * Everything presentational is overridable, because providers get token
+ * metadata wrong constantly — missing logos, truncated names, junk
+ * descriptions — and an operator needs the last word on how a listing looks.
+ *
+ * Prices, liquidity and volume are deliberately absent. Those come from the
+ * pool, and an editable price field would be a fabrication tool.
+ */
+function EditRow({ token, onDone }: { token: Listing; onDone: () => void }) {
+  const update = useListingStore((s) => s.update);
+
+  const [draft, setDraft] = useState({
+    label: token.label ?? '',
+    address: token.address ?? '',
+    pairAddress: token.pairAddress ?? '',
+    category: token.category,
+    logoUrl: token.logoUrl ?? '',
+    coverUrl: token.coverUrl ?? '',
+    blurb: token.blurb ?? '',
+    website: token.website ?? '',
+    twitter: token.twitter ?? '',
+    telegram: token.telegram ?? '',
+    note: token.note ?? '',
+    featured: Boolean(token.featured),
+  });
+
+  const set = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) =>
+    setDraft((d) => ({ ...d, [key]: value }));
 
   const save = () => {
+    const clean = (v: string) => v.trim() || undefined;
     update(token.id, {
-      label: label.trim() || undefined,
-      // Pinning an address here is what upgrades a ticker guess into a
-      // certainty, so it is the most valuable field on this form.
-      address: address.trim() || undefined,
-      category,
-      note: note.trim() || undefined,
+      label: clean(draft.label),
+      address: clean(draft.address),
+      pairAddress: clean(draft.pairAddress),
+      category: draft.category,
+      logoUrl: clean(draft.logoUrl),
+      coverUrl: clean(draft.coverUrl),
+      blurb: clean(draft.blurb),
+      website: clean(draft.website),
+      twitter: clean(draft.twitter),
+      telegram: clean(draft.telegram),
+      note: clean(draft.note),
+      featured: draft.featured,
     });
     onDone();
   };
 
   return (
-    <div className="space-y-2.5 border-t border-line bg-sunken/40 px-4 py-3">
+    <div className="space-y-3 border-t border-line bg-sunken/40 px-4 py-3.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-low">
+        Identity
+      </p>
       <div className="grid gap-2.5 sm:grid-cols-2">
-        <div>
-          <label htmlFor={`lbl-${token.id}`} className="mb-1 block text-[11px] text-ink-mid">
-            Display name
-          </label>
-          <Input
-            id={`lbl-${token.id}`}
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder={token.symbol}
-          />
-        </div>
+        <Field
+          id={`lbl-${token.id}`}
+          label="Display name"
+          value={draft.label}
+          onChange={(v) => set('label', v)}
+          placeholder={token.symbol}
+        />
         <div>
           <label htmlFor={`cat-${token.id}`} className="mb-1 block text-[11px] text-ink-mid">
             Category
           </label>
           <select
             id={`cat-${token.id}`}
-            value={category}
-            onChange={(e) => setCategory(e.target.value as TokenCategory)}
+            value={draft.category}
+            onChange={(e) => set('category', e.target.value as TokenCategory)}
             className="h-9 w-full rounded-md border border-line bg-sunken px-2.5 text-sm text-ink focus:border-brand-500/50 focus:outline-none"
           >
             {CATEGORIES.map((c) => (
@@ -85,41 +149,119 @@ function EditRow({ token, onDone }: { token: TrackedToken; onDone: () => void })
         </div>
       </div>
 
-      <div>
-        <label htmlFor={`addr-${token.id}`} className="mb-1 block text-[11px] text-ink-mid">
-          Contract address{' '}
-          <span className="text-ink-dim">
-            — pin this to stop the ticker matching the wrong token
-          </span>
-        </label>
-        <Input
-          id={`addr-${token.id}`}
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="0x… or a Solana address"
-          className="font-mono text-xs"
+      <Field
+        id={`addr-${token.id}`}
+        label="Contract address"
+        hint="pin this to stop the ticker matching the wrong token"
+        value={draft.address}
+        onChange={(v) => set('address', v)}
+        placeholder="0x… or a Solana address"
+        mono
+      />
+      <Field
+        id={`pair-${token.id}`}
+        label="Pool address"
+        hint="optional; otherwise the deepest pool is used"
+        value={draft.pairAddress}
+        onChange={(v) => set('pairAddress', v)}
+        mono
+      />
+
+      <p className="pt-1 text-[10px] font-semibold uppercase tracking-wider text-ink-low">
+        Presentation
+      </p>
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <Field
+          id={`logo-${token.id}`}
+          label="Logo URL"
+          hint="overrides the provider's"
+          value={draft.logoUrl}
+          onChange={(v) => set('logoUrl', v)}
+          placeholder="https://…"
+        />
+        <Field
+          id={`cover-${token.id}`}
+          label="Cover image URL"
+          hint="wide banner"
+          value={draft.coverUrl}
+          onChange={(v) => set('coverUrl', v)}
+          placeholder="https://…"
         />
       </div>
 
-      <div>
-        <label htmlFor={`note-${token.id}`} className="mb-1 block text-[11px] text-ink-mid">
-          Note <span className="text-ink-dim">(optional)</span>
-        </label>
-        <Input
-          id={`note-${token.id}`}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && save()}
-          placeholder="Why you're tracking it"
+      {(draft.logoUrl || draft.coverUrl) && (
+        <div className="flex items-center gap-3 rounded-md border border-line bg-surface p-2.5">
+          {draft.logoUrl && (
+            <img
+              src={draft.logoUrl}
+              alt=""
+              className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-inset ring-white/10"
+            />
+          )}
+          {draft.coverUrl && (
+            <img
+              src={draft.coverUrl}
+              alt=""
+              className="h-10 min-w-0 flex-1 rounded-sm object-cover"
+            />
+          )}
+          <span className="shrink-0 text-[10px] text-ink-dim">Preview</span>
+        </div>
+      )}
+
+      <Field
+        id={`blurb-${token.id}`}
+        label="Description"
+        value={draft.blurb}
+        onChange={(v) => set('blurb', v)}
+        placeholder="A sentence about the token"
+      />
+
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <Field
+          id={`web-${token.id}`}
+          label="Website"
+          value={draft.website}
+          onChange={(v) => set('website', v)}
+          placeholder="https://…"
+        />
+        <Field
+          id={`tw-${token.id}`}
+          label="X / Twitter"
+          value={draft.twitter}
+          onChange={(v) => set('twitter', v)}
+          placeholder="https://x.com/…"
+        />
+        <Field
+          id={`tg-${token.id}`}
+          label="Telegram"
+          value={draft.telegram}
+          onChange={(v) => set('telegram', v)}
+          placeholder="https://t.me/…"
         />
       </div>
 
-      <div className="flex justify-end gap-2">
+      <Field
+        id={`note-${token.id}`}
+        label="Internal note"
+        hint="not shown publicly"
+        value={draft.note}
+        onChange={(v) => set('note', v)}
+      />
+
+      <Toggle
+        checked={draft.featured}
+        onChange={(v) => set('featured', v)}
+        label="Feature this listing"
+        description="Pins it to the top of the board regardless of the active sort."
+      />
+
+      <div className="flex justify-end gap-2 border-t border-line pt-3">
         <Button size="sm" variant="ghost" onClick={onDone}>
           Cancel
         </Button>
         <Button size="sm" variant="primary" onClick={save}>
-          Save
+          Save listing
         </Button>
       </div>
     </div>
@@ -127,17 +269,17 @@ function EditRow({ token, onDone }: { token: TrackedToken; onDone: () => void })
 }
 
 /**
- * The tracked-token list.
+ * The listing.
  *
  * Shows each entry beside what the live feed actually resolved it to, so a
  * mismatch is visible here rather than being discovered as a wrong price on the
  * board. Unpinned entries carry a warning: they were matched by ticker and
  * could be an impostor.
  */
-export function TrackedTokenList() {
-  const tokens = useRegistryStore((s) => s.tokens);
-  const remove = useRegistryStore((s) => s.remove);
-  const move = useRegistryStore((s) => s.move);
+export function ListingList() {
+  const tokens = useListingStore((s) => s.tokens);
+  const remove = useListingStore((s) => s.remove);
+  const move = useListingStore((s) => s.move);
   const pairs = useMarketStore((s) => s.pairs);
   const { compact: money } = useCurrency();
 
@@ -153,15 +295,15 @@ export function TrackedTokenList() {
   return (
     <div>
       <PanelHeader
-        title="Tracked tokens"
-        subtitle={`${ordered.length} on the board${unpinnedCount ? ` · ${unpinnedCount} unverified` : ''}`}
+        title="Listings"
+        subtitle={`${ordered.length} listed${unpinnedCount ? ` · ${unpinnedCount} unverified` : ''}`}
         icon={<ListChecks className="h-4 w-4" />}
       />
 
       {ordered.length === 0 ? (
         <EmptyState
-          title="No tokens tracked"
-          description="The board is empty until you add something. Search for a token above."
+          title="No tokens listed"
+          description="Nothing is listed yet. Search for a token above to list it."
         />
       ) : (
         <ul className="divide-y divide-line-soft">
@@ -271,7 +413,7 @@ export function TrackedTokenList() {
                     </button>
                     <button
                       onClick={() => remove(token.id)}
-                      aria-label={`Stop tracking ${token.symbol}`}
+                      aria-label={`Delist ${token.symbol}`}
                       className="rounded-sm p-1.5 text-ink-dim transition-colors hover:bg-down/10 hover:text-down"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

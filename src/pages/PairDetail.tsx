@@ -35,6 +35,7 @@ import { SecurityPanel } from '@/components/pair/SecurityPanel';
 import { VerdictPanel } from '@/components/pair/VerdictPanel';
 import { PnlCard } from '@/components/pair/PnlCard';
 import { ProfitCalculator } from '@/components/pair/ProfitCalculator';
+import { ShareCards } from '@/components/pair/ShareCards';
 import type { Pair } from '@/data/types';
 
 /** A copyable on-chain address with an explorer link. */
@@ -171,6 +172,22 @@ export function PairDetail() {
         Back to screener
       </Link>
 
+      {/* Operator-supplied cover banner */}
+      {pair.coverUrl && (
+        <div className="relative mb-4 h-28 overflow-hidden rounded-lg border border-line sm:h-40">
+          <img
+            src={pair.coverUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+          <div
+            className="absolute inset-0 bg-gradient-to-t from-canvas/80 to-transparent"
+            aria-hidden="true"
+          />
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 border-b border-line pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-3.5">
@@ -200,6 +217,12 @@ export function PairDetail() {
             <p className="mt-1 truncate text-sm text-ink-low">
               {pair.baseToken.name} · created {formatAge(pair.createdAt)} ago
             </p>
+
+            {pair.blurb && (
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-mid">
+                {pair.blurb}
+              </p>
+            )}
 
             {socials.length > 0 && (
               <div className="mt-2.5 flex items-center gap-1.5">
@@ -298,6 +321,10 @@ export function PairDetail() {
 
           <Panel className="overflow-hidden">
             <ProfitCalculator pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ShareCards pair={pair} />
           </Panel>
 
           <Panel className="overflow-hidden">

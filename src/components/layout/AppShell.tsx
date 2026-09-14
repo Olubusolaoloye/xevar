@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useMarketFeed } from '@/hooks/useMarketFeed';
+import { useThemeEffect } from '@/hooks/useTheme';
 import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
@@ -12,6 +13,7 @@ export function AppShell() {
 
   // One feed for the whole application, mounted at the shell.
   useMarketFeed();
+  useThemeEffect();
 
   // ⌘K / Ctrl-K from anywhere, and `/` when not already typing.
   useEffect(() => {
