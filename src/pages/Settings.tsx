@@ -6,6 +6,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { Toggle } from '@/components/ui/Toggle';
 import { Button } from '@/components/ui/Button';
 import { Wordmark } from '@/components/brand/Logo';
+import { clearPersistedData } from '@/store/persistedKeys';
 import { PageHeader } from '@/components/layout/PageHeader';
 
 const CURRENCY_OPTIONS = (Object.keys(CURRENCY_SYMBOL) as Currency[]).map((code) => ({
@@ -100,7 +101,7 @@ export function Settings() {
           <div className="divide-y divide-line-soft">
             <Row
               label="Live price feed"
-              description="Majors stream from a public exchange websocket. Long-tail DEX pairs are generated from a fixed seed, so the board is identical on every reload."
+              description="Prices and liquidity come from live DEX pools via DexScreener; charts and trades from GeckoTerminal. Nothing on the board is generated — if a provider cannot be reached, the app says so instead of filling the gap."
               control={
                 <span className="rounded-xs border border-brand-500/25 bg-brand-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-brand-500">
                   Connected
@@ -109,15 +110,13 @@ export function Settings() {
             />
             <Row
               label="Stored locally"
-              description={`${watchlist.length} watched pair${watchlist.length === 1 ? '' : 's'}, plus your wallets, alerts and preferences.`}
+              description={`${watchlist.length} watched pair${watchlist.length === 1 ? '' : 's'}, plus your alerts, recorded positions and preferences.`}
               control={
                 <Button
                   variant="danger"
                   size="sm"
                   onClick={() => {
-                    localStorage.removeItem('panscreener.screener');
-                    localStorage.removeItem('panscreener.portfolio');
-                    localStorage.removeItem('panscreener.prefs');
+                    clearPersistedData();
                     window.location.reload();
                   }}
                 >
@@ -132,9 +131,9 @@ export function Settings() {
           <PanelHeader title="Security" icon={<Wallet className="h-4 w-4" />} />
           <div className="px-4 py-3.5">
             <p className="text-xs leading-relaxed text-ink-mid">
-              PanScreener is read-only. It tracks public addresses, never
-              requests a seed phrase or private key, and has no ability to sign
-              a transaction or move funds. Risk signals on pair pages are
+              PanScreener is read-only. It never requests a seed phrase or
+              private key, never connects a wallet, and has no ability to sign a
+              transaction or move funds. Risk signals on pair pages are
               automated heuristics, not audits — always verify a contract
               yourself.
             </p>

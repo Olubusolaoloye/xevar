@@ -20,6 +20,8 @@ export interface NavItem {
   hint: string;
   /** Exact match only — otherwise `/` would match every route. */
   end?: boolean;
+  /** Reachable, but the screen behind it is not built yet. */
+  soon?: boolean;
 }
 
 /**
@@ -33,7 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', path: '/', icon: LayoutGrid, hint: 'Market pulse and listings', end: true },
   { label: 'Screener', path: '/screener', icon: Radar, hint: 'Every listed pair' },
   { label: 'Watchlist', path: '/watchlist', icon: Star, hint: 'Pairs you are following' },
-  { label: 'Portfolio', path: '/portfolio', icon: Wallet, hint: 'Wallet holdings and performance' },
+  { label: 'Portfolio', path: '/portfolio', icon: Wallet, hint: 'Wallet holdings and performance — coming soon', soon: true },
   { label: 'Alerts', path: '/alerts', icon: Bell, hint: 'Price and liquidity triggers' },
 ];
 

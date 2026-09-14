@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { MarketFeed } from '@/data/feed';
 import { useListingStore } from '@/store/useListingStore';
+import { useAlertStore } from '@/store/useAlertStore';
 import type { FeedStatus, Pair } from '@/data/types';
 
 interface MarketState {
@@ -35,7 +36,15 @@ export const useMarketStore = create<MarketState>((set) => ({
     if (feed) return;
 
     feed = new MarketFeed(
-      (pairs) => set({ pairs, updatedAt: Date.now() }),
+      (pairs) => {
+        set({ pairs, updatedAt: Date.now() });
+        // Alerts are evaluated here rather than in a component, so they keep
+        // firing while the user is on any page — or on none of them, with the
+        // tab in the background. A hook inside the alerts screen would only
+        // work while that screen was open, which is the one time the user is
+        // already looking at the numbers.
+        useAlertStore.getState().evaluate(pairs);
+      },
       (status) => set({ status }),
     );
     feed.start();

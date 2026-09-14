@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react';
-import { Bell, BellRing, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Bell, BellOff, BellRing, History, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatAge, formatCompact } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketStore } from '@/store/useMarketStore';
-import { usePortfolioStore } from '@/store/usePortfolioStore';
+import {
+  conditionMet,
+  readMetric,
+  useAlertStore,
+} from '@/store/useAlertStore';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -23,20 +27,6 @@ const METRIC_LABEL: Record<AlertMetric, string> = {
   volume24h: '24h volume',
 };
 
-/** Read the value an alert watches off a pair. */
-function readMetric(pair: Pair, metric: AlertMetric): number {
-  switch (metric) {
-    case 'price':
-      return pair.priceUsd;
-    case 'change24h':
-      return pair.change.h24;
-    case 'liquidity':
-      return pair.liquidityUsd;
-    case 'volume24h':
-      return pair.volume.h24;
-  }
-}
-
 function describe(alert: Alert, format: (usd: number) => string): string {
   const threshold =
     alert.metric === 'change24h'
@@ -47,7 +37,7 @@ function describe(alert: Alert, format: (usd: number) => string): string {
 
 function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pairs = useMarketStore((s) => s.pairs);
-  const addAlert = usePortfolioStore((s) => s.addAlert);
+  const addAlert = useAlertStore((s) => s.addAlert);
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Pair | null>(null);
@@ -196,14 +186,60 @@ function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
+/**
+ * Desktop notification opt-in.
+ *
+ * Only rendered while permission is still "default". Once the user has
+ * answered — either way — the browser will not ask again, so a button that
+ * stays on screen would do nothing when pressed.
+ */
+function NotifyOptIn() {
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(
+    typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
+  );
+
+  if (permission !== 'default') return null;
+
+  const ask = async () => {
+    try {
+      setPermission(await Notification.requestPermission());
+    } catch {
+      setPermission('denied');
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void ask()}
+      className="mt-3 flex w-full items-center gap-2 rounded-md border border-line bg-sunken px-3.5 py-2.5 text-left text-[11px] leading-relaxed text-ink-low transition-colors hover:border-brand-500/40 hover:text-ink-mid"
+    >
+      <BellRing className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+      <span>
+        <span className="font-medium text-ink-mid">Get notified outside the tab.</span>{' '}
+        Allow desktop notifications and a fired alert will reach you even when
+        PanScreener is in the background.
+      </span>
+    </button>
+  );
+}
+
 export function Alerts() {
-  const alerts = usePortfolioStore((s) => s.alerts);
-  const toggleAlert = usePortfolioStore((s) => s.toggleAlert);
-  const removeAlert = usePortfolioStore((s) => s.removeAlert);
+  const alerts = useAlertStore((s) => s.alerts);
+  const events = useAlertStore((s) => s.events);
+  const toggleAlert = useAlertStore((s) => s.toggleAlert);
+  const removeAlert = useAlertStore((s) => s.removeAlert);
+  const markEventsRead = useAlertStore((s) => s.markEventsRead);
+  const clearEvents = useAlertStore((s) => s.clearEvents);
   const pairs = useMarketStore((s) => s.pairs);
   const { compact: money, priceText } = useCurrency();
 
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Looking at the page is what marks the log as seen.
+  useEffect(() => {
+    if (events.some((e) => !e.read)) markEventsRead();
+  }, [events, markEventsRead]);
 
   const active = alerts.filter((alert) => alert.enabled).length;
 
@@ -212,7 +248,7 @@ export function Alerts() {
       <PageHeader
         eyebrow="Monitoring"
         title="Alerts"
-        description="Trigger conditions on price, liquidity and flow across any tracked pair."
+        description="Trigger conditions on price, liquidity and flow across any listed pair."
         action={
           <Button variant="primary" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -246,12 +282,10 @@ export function Alerts() {
               const current = pair ? readMetric(pair, alert.metric) : null;
 
               // An alert whose condition is already true right now is worth
-              // surfacing — it is about to fire, or just has.
-              const met =
-                current !== null &&
-                (alert.comparator === 'above'
-                  ? current > alert.threshold
-                  : current < alert.threshold);
+              // surfacing — it is about to fire, or just has. Uses the same
+              // predicate the evaluator fires on, so the badge cannot disagree
+              // with what actually triggers.
+              const met = current !== null && conditionMet(alert, current);
 
               return (
                 <li
@@ -321,9 +355,69 @@ export function Alerts() {
         )}
       </Panel>
 
+      <NotifyOptIn />
+
+      {(alerts.length > 0 || events.length > 0) && (
+      <Panel className="mt-4 overflow-hidden">
+        <PanelHeader
+          title="Recent activity"
+          subtitle={events.length === 0 ? 'Nothing yet' : `Last ${events.length}`}
+          icon={<History className="h-4 w-4" />}
+          action={
+            events.length > 0 ? (
+              <Button size="sm" variant="ghost" onClick={clearEvents}>
+                Clear
+              </Button>
+            ) : undefined
+          }
+        />
+
+        {events.length === 0 ? (
+          <EmptyState
+            icon={<BellOff className="h-5 w-5" />}
+            title="No alerts have fired"
+            description="When a condition is crossed it is recorded here, with the value that crossed it and the time."
+          />
+        ) : (
+          <ul className="divide-y divide-line-soft">
+            {events.map((event) => (
+              <li key={event.id} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+                <p className="min-w-0 text-xs text-ink-mid">
+                  <span className="font-medium text-ink">{event.pairLabel}</span>
+                  <span className="text-ink-low">
+                    {' — '}
+                    {METRIC_LABEL[event.metric].toLowerCase()} went {event.comparator}{' '}
+                    {event.metric === 'change24h'
+                      ? `${event.threshold}%`
+                      : event.metric === 'price'
+                        ? priceText(event.threshold)
+                        : formatCompact(event.threshold, '$')}
+                  </span>
+                  <span className="text-ink-dim">
+                    {' at '}
+                    {event.metric === 'change24h'
+                      ? `${event.value.toFixed(1)}%`
+                      : event.metric === 'price'
+                        ? priceText(event.value)
+                        : formatCompact(event.value, '$')}
+                  </span>
+                </p>
+                <span className="shrink-0 text-[11px] tabular-nums text-ink-dim">
+                  {formatAge(event.at)} ago
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+      )}
+
       <p className="mt-3 px-1 text-[11px] leading-relaxed text-ink-dim">
-        Alerts evaluate against the in-app board while PanScreener is open. Push
-        and email delivery are not wired up in this build.
+        Conditions are checked against the live board every time it refreshes,
+        on whichever page you are on. An alert fires when its condition is
+        crossed, not for every refresh it stays true, and re-arms once the
+        condition clears. Delivery is in-app, plus a desktop notification if you
+        allow one — there is no email or push in this build.
       </p>
 
       <CreateAlertModal open={createOpen} onClose={() => setCreateOpen(false)} />

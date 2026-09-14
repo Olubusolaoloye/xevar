@@ -278,7 +278,7 @@ interface BoostEntry {
  * Currently boosted tokens, resolved to their pairs.
  *
  * This is the closest thing the public API has to a trending feed, and it is
- * how the board gets seeded without a hardcoded token list. Rate limited to 60
+ * how the board is populated without a hardcoded token list. Rate limited to 60
  * requests per minute, so it is polled far less often than the pairs endpoint.
  */
 export async function fetchBoostedPairs(limit = 30): Promise<Pair[]> {

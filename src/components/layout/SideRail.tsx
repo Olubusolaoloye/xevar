@@ -37,7 +37,16 @@ function RailLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
             <span className="absolute -left-2.5 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-brand-500" />
           )}
           <item.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-          {!collapsed && <span className="truncate">{item.label}</span>}
+          {!collapsed && (
+            <>
+              <span className="truncate">{item.label}</span>
+              {item.soon && (
+                <span className="ml-auto shrink-0 rounded-xs bg-warn/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-warn">
+                  Soon
+                </span>
+              )}
+            </>
+          )}
         </>
       )}
     </NavLink>

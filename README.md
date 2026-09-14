@@ -5,8 +5,8 @@
 **Every pair. Every chain. One board.**
 
 A live multi-chain DEX screener — pair-level price, liquidity, order flow and
-automated risk signals across eight networks, with wallet portfolio tracking
-and threshold alerts.
+automated risk signals across eight networks, with threshold alerts and
+shareable P&L cards.
 
 </div>
 
@@ -18,18 +18,30 @@ PanScreener is a dense, real-time market board in the tradition of DEX
 screeners, rebuilt around a strict design-token system and a swappable data
 layer.
 
-- **Screener** — 160 pairs across 8 networks, sortable on every column, with
-  five rolling windows (5m / 1h / 6h / 24h), buy-sell pressure bars, inline
-  sparklines and live price flashing.
-- **Filters** — one-click presets (Trending, New pairs, Gainers, Losers, Top
-  volume, Liquidity locked) plus network, exchange, liquidity, volume and age
-  thresholds.
+- **Screener** — every listed pair, sortable on each column, with rolling
+  windows (5m / 1h / 6h / 24h), buy-sell pressure bars, inline sparklines and
+  live price flashing.
+- **Filters** — one-click presets (Trending, New listings, Gainers, Losers)
+  plus network, exchange, liquidity, volume and age thresholds. The exchange
+  list is derived from the pairs actually on the board, not hardcoded.
 - **Pair pages** — price chart over five ranges, a live trade tape, order-flow
   breakdown per window, and a risk-signal panel.
-- **Portfolio** — track any public EVM or Solana address; positions valued
-  live, with cost basis, unrealised P&L and allocation by network.
-- **Alerts** — threshold triggers on price, 24h change, liquidity or volume.
+- **Alerts** — threshold triggers on price, 24h change, liquidity or volume,
+  evaluated against the live board on every refresh. Edge-triggered: an alert
+  fires when its condition is crossed, then re-arms once it clears.
+- **P&L** — record a position on any token page and track it live, or export a
+  shareable card.
 - **Command palette** — `⌘K` (or `/`) to reach any pair or page instantly.
+- **Portfolio** — not built yet; the screen says so rather than showing
+  invented balances.
+
+### No invented data
+
+There is no demo, sample or seeded market anywhere in the app. Every price,
+liquidity figure, candle and trade comes from a live provider. Where a provider
+cannot be reached the app says so and renders nothing — it never fills the gap
+with a generated series, because a plausible-looking chart of a market that
+never happened is the one thing a market app must not draw.
 
 ## Running it
 
@@ -144,7 +156,7 @@ reach the client.
 | --- | --- |
 | Listings and their presentation | Watchlist |
 | Carousel adverts | Recorded positions and P&L |
-| Refresh rate, verdict provider | Tracked wallets, alerts |
+| Refresh rate, verdict provider | Alerts and their history |
 | | Theme, currency, density |
 
 Personal data stays in the browser deliberately — nobody's watchlist belongs
@@ -163,9 +175,9 @@ src/
     query.ts        pure filter/sort engine
     feed.ts         composes the sources into one live stream
     sources/
-      binance.ts    real websocket prices for majors
-      mock.ts       seeded, deterministic long-tail market
-  store/            zustand: market, screener, portfolio, prefs
+      dexscreener.ts  live pair prices, liquidity and flow
+      geckoterminal.ts OHLCV candles and recent trades
+  store/            zustand: market, screener, alerts, listings, prefs
   hooks/            feed lifecycle, price flash, currency, queries
   components/
     ui/             16 token-driven primitives
@@ -174,7 +186,7 @@ src/
     screener/       table, row, card, filters, trending, presets
     pair/           chart, trade tape, risk panel
   pages/            Overview · Screener · PairDetail · Watchlist ·
-                    Portfolio · Alerts · Settings · NotFound
+                    MultiChart · Alerts · Settings · Admin · NotFound
 ```
 
 ### Re-skinning
@@ -190,15 +202,14 @@ Every source produces the same shapes from `src/data/types.ts`. To add a real
 on-chain API, implement a source under `src/data/sources/` and register it in
 `src/data/feed.ts`. No component changes.
 
-Out of the box, majors stream from Binance's public all-market ticker
-websocket, while long-tail DEX pairs are generated from a fixed seed — so the
-board is byte-identical on every reload, and metrics stay internally coherent
-(liquidity, volume, transaction counts and volatility are derived from one
-another rather than drawn independently).
+Out of the box the board is assembled from DexScreener (prices, liquidity,
+volume, transaction counts) and GeckoTerminal (candles and trades). Both are
+free and keyless. A source that fails is reported as a failure rather than
+substituted for — see **No invented data** above.
 
 ## Notes
 
-- Read-only by design: PanScreener tracks public addresses, never requests a
-  seed phrase or private key, and cannot sign transactions or move funds.
+- Read-only by design: PanScreener never requests a seed phrase or private
+  key, never connects a wallet, and cannot sign transactions or move funds.
 - Risk signals are automated heuristics, not audits.
 - Nothing here is financial advice.

@@ -9,7 +9,7 @@ export interface ChainMeta {
   short: string;
   /** Resolves to the `--color-chain-*` token declared in tokens.css. */
   colorVar: string;
-  /** Address shape, used by the mock generator and address validation. */
+  /** Address shape, for validating a pasted address against the chain. */
   addressStyle: 'evm' | 'base58';
   explorer: string;
 }
@@ -92,19 +92,3 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
 export const CHAIN_IDS = Object.keys(CHAINS) as ChainId[];
 
 export const CHAIN_LIST: ChainMeta[] = CHAIN_IDS.map((id) => CHAINS[id]);
-
-/** Which exchanges are plausible on which chain — keeps mock data coherent. */
-export const DEXES_BY_CHAIN: Record<ChainId, string[]> = {
-  ethereum: ['Uniswap V3', 'Uniswap V2', 'Curve', 'Balancer', 'SushiSwap'],
-  solana: ['Raydium', 'Orca', 'Meteora', 'Pump.fun', 'Lifinity'],
-  bsc: ['PancakeSwap V3', 'PancakeSwap V2', 'Biswap', 'THENA'],
-  base: ['Aerodrome', 'Uniswap V3', 'BaseSwap', 'SushiSwap'],
-  arbitrum: ['Camelot', 'Uniswap V3', 'Ramses', 'TraderJoe'],
-  polygon: ['QuickSwap', 'Uniswap V3', 'Balancer'],
-  avalanche: ['TraderJoe', 'Pangolin', 'Pharaoh'],
-  sui: ['Cetus', 'Turbos', 'Aftermath'],
-};
-
-export const ALL_DEXES: string[] = Array.from(
-  new Set(Object.values(DEXES_BY_CHAIN).flat()),
-).sort();

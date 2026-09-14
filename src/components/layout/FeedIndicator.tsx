@@ -25,13 +25,6 @@ const COPY: Record<FeedStatus, { label: string; detail: string; dot: string; tex
     dot: 'bg-warn',
     text: 'text-warn',
   },
-  seeded: {
-    label: 'Demo data',
-    detail:
-      'The market API could not be reached, so this is generated sample data — not real prices. Check your connection.',
-    dot: 'bg-accent-500',
-    text: 'text-accent-500',
-  },
   offline: {
     label: 'Offline',
     detail: 'No market data available. Showing the last known board.',

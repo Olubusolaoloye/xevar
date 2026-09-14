@@ -85,7 +85,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
   const { priceText, convert, symbol } = useCurrency();
 
   const spec = RANGE_SPEC[range];
-  const { data: candles, loading, simulated } = usePairCandles(pair, spec.interval);
+  const { data: candles, loading, failed } = usePairCandles(pair, spec.interval);
   const data = useMemo(() => candles.slice(-spec.bars), [candles, spec.bars]);
 
   const rising = data.length > 1 && data[data.length - 1].close >= data[0].close;
@@ -96,11 +96,6 @@ export function PriceChart({ pair }: { pair: Pair }) {
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-ink-low">
           Price
-          {simulated && (
-            <span className="rounded-xs bg-accent-500/12 px-1 py-0.5 text-accent-500 normal-case tracking-normal">
-              sample history
-            </span>
-          )}
         </p>
         <SegmentedControl<Range>
           options={RANGE_OPTIONS}
@@ -115,7 +110,9 @@ export function PriceChart({ pair }: { pair: Pair }) {
           <Skeleton className="h-full w-full" />
         ) : data.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-low">
-            No price history for this pool yet.
+            {failed
+              ? 'Could not load price history. The chart provider is unreachable — nothing is drawn rather than guessed.'
+              : 'No price history for this pool yet.'}
           </div>
         ) : (
         <ResponsiveContainer width="100%" height="100%">
