@@ -16,10 +16,10 @@ import { useMarketStore } from '@/store/useMarketStore';
 import { Button } from '@/components/ui/Button';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { Stat } from '@/components/ui/Stat';
-import { Wordmark } from '@/components/brand/Logo';
 import { MiniPairList } from '@/components/screener/MiniPairList';
 import { PairTable } from '@/components/screener/PairTable';
 import { TrendingBar } from '@/components/screener/TrendingBar';
+import { AdCarousel } from '@/components/marketing/AdCarousel';
 
 /**
  * The market pulse strip.
@@ -80,66 +80,6 @@ function MarketPulse() {
   );
 }
 
-/** The signature hero: aurora blooms over hairline graph paper. */
-function Hero() {
-  return (
-    <section className="relative overflow-hidden border-b border-line">
-      {/* Backdrop layers, purely decorative. */}
-      <div className="absolute inset-0 grid-paper opacity-60" aria-hidden="true" />
-      <div
-        className="aurora pointer-events-none absolute -left-32 -top-40 h-[420px] w-[420px] rounded-full opacity-25 blur-[110px]"
-        style={{ background: 'var(--color-brand-500)' }}
-        aria-hidden="true"
-      />
-      <div
-        className="aurora pointer-events-none absolute -right-24 top-10 h-[360px] w-[360px] rounded-full opacity-20 blur-[110px]"
-        style={{ background: 'var(--color-accent-500)', animationDelay: '-9s' }}
-        aria-hidden="true"
-      />
-      {/* Fade the backdrop into the page below. */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-canvas to-transparent"
-        aria-hidden="true"
-      />
-
-      <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-500/25 bg-brand-500/8 px-3 py-1 text-[11px] font-medium text-brand-500">
-          <Sparkles className="h-3 w-3" />
-          Live across 8 networks
-        </span>
-
-        <h1 className="mt-5 max-w-3xl font-display text-4xl font-bold leading-[1.05] tracking-[-0.03em] text-ink sm:text-6xl">
-          Every pair.
-          <br />
-          <span className="bg-gradient-to-r from-brand-500 via-brand-300 to-brand-500 bg-clip-text text-transparent">
-            Every chain.
-          </span>{' '}
-          One board.
-        </h1>
-
-        <p className="mt-5 max-w-xl text-sm leading-relaxed text-ink-mid sm:text-base">
-          PanScreener streams live DEX markets into a single instrument — price,
-          depth, flow and risk signals, side by side, updating as they move.
-        </p>
-
-        <div className="mt-7 flex flex-wrap items-center gap-2.5">
-          <Link to="/screener">
-            <Button variant="primary" size="lg">
-              Open the screener
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
-          <Link to="/portfolio">
-            <Button variant="outline" size="lg">
-              Track a wallet
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function Overview() {
   const pairs = useMarketStore((s) => s.pairs);
 
@@ -166,7 +106,7 @@ export function Overview() {
 
   return (
     <div>
-      <Hero />
+      <AdCarousel />
       <TrendingBar />
 
       <div className="mx-auto max-w-7xl space-y-4 px-4 py-6 sm:px-6">
