@@ -468,7 +468,7 @@ export function Portfolio() {
                       </span>
                       <button
                         onClick={() => removeWallet(wallet.id)}
-                        aria-label={`Stop tracking ${wallet.label}`}
+                        aria-label={`Delist ${wallet.label}`}
                         className="rounded-sm p-1.5 text-ink-dim transition-colors hover:bg-down/10 hover:text-down"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

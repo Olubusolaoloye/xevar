@@ -75,24 +75,6 @@ export const PRESETS: Preset[] = [
     sortDirection: 'asc',
     timeframe: 'h24',
   },
-  {
-    id: 'volume',
-    label: 'Top volume',
-    description: 'Most traded pairs across every chain',
-    filters: {},
-    sortKey: 'volume',
-    sortDirection: 'desc',
-    timeframe: 'h24',
-  },
-  {
-    id: 'safe',
-    label: 'Liquidity locked',
-    description: 'Deep pools with locked or burned liquidity',
-    filters: { liquidityLockedOnly: true, minLiquidity: 250_000 },
-    sortKey: 'liquidityUsd',
-    sortDirection: 'desc',
-    timeframe: 'h24',
-  },
 ];
 
 interface ScreenerState extends ScreenerFilters {

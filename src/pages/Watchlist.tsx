@@ -80,7 +80,7 @@ export function Watchlist() {
           pairs={watched}
           timeframe={timeframe}
           emptyTitle="Your watchlist is empty"
-          emptyDescription="Star any pair from the screener and it will appear here, tracked live."
+          emptyDescription="Star any listing from the screener and it will appear here, updating live."
           emptyAction={
             <Link to="/screener">
               <Button variant="primary" size="sm">

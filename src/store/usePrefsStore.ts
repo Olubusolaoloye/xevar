@@ -18,12 +18,20 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
   NGN: '₦',
 };
 
+/**
+ * Three states, not two. "system" follows the OS and is the default, which is
+ * why it stamps nothing on the root and lets the media query decide.
+ */
+export type ThemeChoice = 'system' | 'light' | 'dark';
+
 interface PrefsState {
+  theme: ThemeChoice;
   currency: Currency;
   /** Collapse the desktop navigation rail to icons only. */
   railCollapsed: boolean;
   /** Suppress the live tick flash animation on table rows. */
   reduceFlash: boolean;
+  setTheme: (theme: ThemeChoice) => void;
   setCurrency: (currency: Currency) => void;
   toggleRail: () => void;
   setReduceFlash: (value: boolean) => void;
@@ -32,9 +40,11 @@ interface PrefsState {
 export const usePrefsStore = create<PrefsState>()(
   persist(
     (set) => ({
+      theme: 'system',
       currency: 'USD',
       railCollapsed: false,
       reduceFlash: false,
+      setTheme: (theme) => set({ theme }),
       setCurrency: (currency) => set({ currency }),
       toggleRail: () => set((state) => ({ railCollapsed: !state.railCollapsed })),
       setReduceFlash: (reduceFlash) => set({ reduceFlash }),

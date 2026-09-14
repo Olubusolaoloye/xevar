@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { MarketFeed } from '@/data/feed';
-import { useRegistryStore } from '@/store/useRegistryStore';
+import { useListingStore } from '@/store/useListingStore';
 import type { FeedStatus, Pair } from '@/data/types';
 
 interface MarketState {
@@ -40,9 +40,9 @@ export const useMarketStore = create<MarketState>((set) => ({
     );
     feed.start();
 
-    // Editing the tracked-token list must change the board straight away
+    // Editing the listing must change the board straight away
     // rather than waiting out the poll interval.
-    unsubscribeRegistry = useRegistryStore.subscribe((state, previous) => {
+    unsubscribeRegistry = useListingStore.subscribe((state, previous) => {
       if (state.tokens !== previous.tokens) feed?.refresh();
     });
   },

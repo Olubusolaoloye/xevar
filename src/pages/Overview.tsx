@@ -39,7 +39,7 @@ function MarketPulse() {
         <Stat
           label="24h volume"
           value={money(summary.volume24h)}
-          detail={`${formatCount(summary.pairCount)} pairs tracked`}
+          detail={`${formatCount(summary.pairCount)} pairs listed`}
           icon={<Activity className="h-3 w-3" />}
         />
       </div>
@@ -145,11 +145,11 @@ export function Overview() {
 
         <Panel className="overflow-hidden">
           <PanelHeader
-            title={compact ? 'Tracked tokens' : 'Highest volume'}
+            title="Listings"
             subtitle={
               compact
-                ? 'Everything currently on your board'
-                : 'Across every tracked network'
+                ? 'Every token currently listed'
+                : 'Across every listed network'
             }
             icon={<Activity className="h-4 w-4" />}
             action={
@@ -165,7 +165,7 @@ export function Overview() {
             pairs={topVolume}
             timeframe="h24"
             pageSize={12}
-            emptyTitle="No tokens on the board yet"
+            emptyTitle="No tokens listed yet"
             emptyDescription="Add the tokens you want to follow and their live prices will appear here."
             emptyAction={
               <Link to="/admin">

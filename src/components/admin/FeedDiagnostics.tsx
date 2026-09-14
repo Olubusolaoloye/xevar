@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { formatAge } from '@/lib/format';
 import { useMarketStore } from '@/store/useMarketStore';
 import { useAdminStore } from '@/store/useAdminStore';
-import { useRegistryStore, type TrackedToken } from '@/store/useRegistryStore';
+import { useListingStore, type Listing } from '@/store/useListingStore';
 import { Button } from '@/components/ui/Button';
 import { PanelHeader } from '@/components/ui/Panel';
 import type { FeedStatus } from '@/data/types';
@@ -12,7 +12,7 @@ import type { FeedStatus } from '@/data/types';
 const STATUS_COPY: Record<FeedStatus, { label: string; detail: string; tone: string }> = {
   connecting: {
     label: 'Connecting',
-    detail: 'Fetching the tracked tokens from DexScreener.',
+    detail: 'Fetching listed tokens from DexScreener.',
     tone: 'text-warn',
   },
   live: {
@@ -44,7 +44,7 @@ const STATUS_COPY: Record<FeedStatus, { label: string; detail: string; tone: str
  *
  * Exists so "the prices look wrong" is a question with an answer rather than a
  * hunch. It states plainly whether numbers are live, how old they are, how many
- * tracked tokens actually resolved to a pool, and which ones did not.
+ * listings actually resolved to a pool, and which ones did not.
  */
 export function FeedDiagnostics() {
   const status = useMarketStore((s) => s.status);
@@ -53,8 +53,8 @@ export function FeedDiagnostics() {
   const refresh = useMarketStore((s) => s.refresh);
 
   const pollSeconds = useAdminStore((s) => s.pollSeconds);
-  const tokens = useRegistryStore((s) => s.tokens);
-  const replaceAll = useRegistryStore((s) => s.replaceAll);
+  const tokens = useListingStore((s) => s.tokens);
+  const replaceAll = useListingStore((s) => s.replaceAll);
 
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -80,7 +80,7 @@ export function FeedDiagnostics() {
     file
       .text()
       .then((text) => {
-        const parsed = JSON.parse(text) as TrackedToken[];
+        const parsed = JSON.parse(text) as Listing[];
         if (!Array.isArray(parsed)) throw new Error('not a list');
         // Validate before replacing: a malformed import would otherwise wipe
         // the board and leave nothing to recover from.
@@ -122,7 +122,7 @@ export function FeedDiagnostics() {
 
         <div className="grid grid-cols-3 gap-px overflow-hidden rounded-md border border-line bg-line">
           {[
-            { label: 'Tracked', value: tokens.length, tone: 'text-ink' },
+            { label: 'Listed', value: tokens.length, tone: 'text-ink' },
             { label: 'Resolved', value: resolved, tone: 'text-up' },
             {
               label: 'Missing',
@@ -143,7 +143,7 @@ export function FeedDiagnostics() {
 
         {missing > 0 && (
           <p className="rounded-sm border border-warn/25 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-warn">
-            {missing} tracked {missing === 1 ? 'token has' : 'tokens have'} no pool
+            {missing} listed {missing === 1 ? 'token has' : 'tokens have'} no pool
             on the live feed. Either the ticker matched nothing on that network, or
             the token has no DEX liquidity. Pin its contract address to be sure.
           </p>
@@ -176,7 +176,7 @@ export function FeedDiagnostics() {
         {importError && <p className="text-xs text-down">{importError}</p>}
 
         <p className="text-[11px] leading-relaxed text-ink-dim">
-          The token list lives in this browser only. Export it to move it to
+          The listings live in this browser only. Export it to move it to
           another device or to keep a backup.
         </p>
       </div>

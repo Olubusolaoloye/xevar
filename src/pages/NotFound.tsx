@@ -12,7 +12,7 @@ export function NotFound() {
       <EmptyState
         icon={<Compass className="h-5 w-5" />}
         title="This page does not exist"
-        description="The link may be stale, or the pair may no longer be on the board."
+        description="The link may be stale, or the pair may no longer be listed."
         action={
           <Link to="/">
             <Button variant="primary" size="sm">

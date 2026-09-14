@@ -133,3 +133,132 @@
   --tape-up:   #1dbf63;
   --tape-down: #e03540;
 }
+
+/* ============================================================================
+   LIGHT THEME
+   ----------------------------------------------------------------------------
+   PanScreener is dark-first — a screener is stared at for hours and a dark
+   ground is easier on the eye — so the @theme block above is the dark palette
+   and this redefines only what changes.
+
+   Three states, not two. An explicit choice stamps data-theme on the root; the
+   default "system" setting stamps nothing, so `prefers-color-scheme` has to
+   carry it. Both are handled, and the explicit stamp wins in either direction.
+
+   Only tokens are redefined here. No component reaches into a theme block, so
+   a colour can never exist in one theme and not the other.
+   ========================================================================== */
+
+@layer theme {
+  /* Explicit light choice. */
+  :root[data-theme='light'] {
+    /* Warm paper rather than pure white — the same warm bias as the dark
+       canvas, so the golden accent stays golden instead of turning acid. */
+    --color-canvas:    #faf8f4;
+    --color-sunken:    #f2eee6;
+    --color-surface:   #ffffff;
+    --color-raised:    #f6f2ea;
+    --color-overlay:   #ffffff;
+
+    --color-line:        #e6e0d4;
+    --color-line-strong: #d4ccbc;
+    --color-line-soft:   #f0ebe1;
+
+    --color-ink:      #1a1713;
+    --color-ink-mid:  #524d44;
+    --color-ink-low:  #7d766a;
+    --color-ink-dim:  #a8a091;
+
+    /* The brand yellow is legible on dark but washes out on paper, so the
+       accent steps two stops darker to keep text contrast usable. */
+    --color-brand-500: #a87d0b;
+    --color-brand-400: #c08f0d;
+    --color-brand-600: #745607;
+
+    /* Gains and losses darken for the same reason. */
+    --color-up:        #0f8f48;
+    --color-up-soft:   #0f8f4817;
+    --color-down:      #c42631;
+    --color-down-soft: #c4263117;
+    --color-flat:      #7d766a;
+
+    --color-warn:      #b4611f;
+    --color-warn-soft: #b4611f17;
+    --color-info:      #2b5fc4;
+    --color-info-soft: #2b5fc417;
+    --color-danger:    #a5161f;
+
+    --shadow-panel:   0 1px 0 0 #ffffff inset, 0 1px 2px #1a171310;
+    --shadow-lifted:  0 1px 0 0 #ffffff inset, 0 8px 24px -6px #1a171320;
+    --shadow-popover: 0 1px 0 0 #ffffff inset, 0 16px 48px -12px #1a171326;
+    --shadow-glow:    0 0 0 1px #a87d0b33, 0 8px 32px -8px #a87d0b30;
+  }
+
+  /* System preference, when no explicit choice has been stamped. The guard
+     stops an OS set to light from overriding a deliberate dark selection. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme='dark']) {
+      --color-canvas:    #faf8f4;
+      --color-sunken:    #f2eee6;
+      --color-surface:   #ffffff;
+      --color-raised:    #f6f2ea;
+      --color-overlay:   #ffffff;
+
+      --color-line:        #e6e0d4;
+      --color-line-strong: #d4ccbc;
+      --color-line-soft:   #f0ebe1;
+
+      --color-ink:      #1a1713;
+      --color-ink-mid:  #524d44;
+      --color-ink-low:  #7d766a;
+      --color-ink-dim:  #a8a091;
+
+      --color-brand-500: #a87d0b;
+      --color-brand-400: #c08f0d;
+      --color-brand-600: #745607;
+
+      --color-up:        #0f8f48;
+      --color-up-soft:   #0f8f4817;
+      --color-down:      #c42631;
+      --color-down-soft: #c4263117;
+      --color-flat:      #7d766a;
+
+      --color-warn:      #b4611f;
+      --color-warn-soft: #b4611f17;
+      --color-info:      #2b5fc4;
+      --color-info-soft: #2b5fc417;
+      --color-danger:    #a5161f;
+
+      --shadow-panel:   0 1px 0 0 #ffffff inset, 0 1px 2px #1a171310;
+      --shadow-lifted:  0 1px 0 0 #ffffff inset, 0 8px 24px -6px #1a171320;
+      --shadow-popover: 0 1px 0 0 #ffffff inset, 0 16px 48px -12px #1a171326;
+      --shadow-glow:    0 0 0 1px #a87d0b33, 0 8px 32px -8px #a87d0b30;
+    }
+  }
+}
+
+/* Chart grid lines are read as a plain var by the chart components, so they
+   follow the theme too. Both rules are guarded the same way as the palette
+   above — an unguarded `:not([data-theme='dark'])` would also match a system
+   set to dark, giving light grid lines on a dark chart. */
+:root[data-theme='light'] {
+  --grid-line: #1a171310;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --grid-line: #1a171310;
+    color-scheme: light;
+  }
+}
+
+/* Declaring the scheme keeps native scrollbars, form controls and the
+   browser's own chrome in step with the palette. */
+:root {
+  color-scheme: dark;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
