@@ -19,6 +19,60 @@ const TONE_COLOR = {
   brand: 'var(--color-brand-500)',
 } as const;
 
+export interface SparklineGeometry {
+  linePath: string;
+  areaPath: string;
+  /** Number of points that survived the finite filter. */
+  plotted: number;
+}
+
+/**
+ * Turn a series into SVG path data.
+ *
+ * Exported for tests: this is where a bad datum used to become an invisible
+ * chart, and where a motionless price used to look like a crash.
+ */
+export function sparklineGeometry(
+  data: readonly number[],
+  width: number,
+  height: number,
+  strokeWidth: number,
+): SparklineGeometry {
+  // Drop anything that cannot be placed on an axis. A single Infinity or NaN
+  // poisons min/max, turns every coordinate into NaN, and the browser discards
+  // the whole path — the chart vanishes with no error anywhere.
+  const points = data.filter((value) => Number.isFinite(value));
+  if (points.length < 2) return { linePath: '', areaPath: '', plotted: points.length };
+
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const range = max - min;
+  // Inset vertically so the stroke is never clipped by the viewBox edge.
+  const padY = strokeWidth;
+  const usableH = Math.max(0, height - padY * 2);
+
+  // A flat series has no meaningful vertical position, so centre it. The
+  // previous `max - min || 1` pinned every point to the bottom edge, which
+  // read as a broken chart rather than as "this price has not moved".
+  const yFor = (value: number) =>
+    range === 0 ? padY + usableH / 2 : padY + (1 - (value - min) / range) * usableH;
+
+  const stepX = width / (points.length - 1);
+
+  const linePath = points
+    .map((value, i) => {
+      const x = i * stepX;
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${yFor(value).toFixed(2)}`;
+    })
+    .join(' ');
+
+  return {
+    linePath,
+    areaPath: `${linePath} L${width},${height} L0,${height} Z`,
+    plotted: points.length,
+  };
+}
+
 /**
  * A dependency-free inline trend line.
  *
@@ -37,32 +91,16 @@ export function Sparkline({
   const gradientId = useId();
 
   const { linePath, areaPath, color } = useMemo(() => {
-    if (data.length < 2) {
-      return { linePath: '', areaPath: '', color: TONE_COLOR.brand };
-    }
+    const { linePath: line, areaPath: area, plotted } = sparklineGeometry(
+      data,
+      width,
+      height,
+      strokeWidth,
+    );
+    if (!line) return { linePath: '', areaPath: '', color: TONE_COLOR.brand };
 
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    // A perfectly flat series would divide by zero; draw it down the middle.
-    const span = max - min || 1;
-    const stepX = width / (data.length - 1);
-    // Inset vertically so the stroke is never clipped by the viewBox edge.
-    const padY = strokeWidth;
-
-    const points = data.map((value, i) => {
-      const x = i * stepX;
-      const y = padY + (1 - (value - min) / span) * (height - padY * 2);
-      return [x, y] as const;
-    });
-
-    const line = points
-      .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`)
-      .join(' ');
-
-    const area = `${line} L${width},${height} L0,${height} Z`;
-
-    const resolved =
-      tone ?? (data[data.length - 1] >= data[0] ? 'up' : 'down');
+    const finite = data.filter((value) => Number.isFinite(value));
+    const resolved = tone ?? (finite[plotted - 1] >= finite[0] ? 'up' : 'down');
 
     return { linePath: line, areaPath: area, color: TONE_COLOR[resolved] };
   }, [data, width, height, tone, strokeWidth]);
