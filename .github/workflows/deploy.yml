@@ -38,6 +38,16 @@ jobs:
           VITE_BASE: /${{ github.event.repository.name }}/
         run: npm run build
 
+      - name: Write build version
+        # The running app polls this to notice it is out of date. GitHub Pages
+        # caches index.html for ten minutes and honours no config we can ship,
+        # so the app has to detect staleness itself.
+        run: |
+          printf '{"buildId":"%s","builtAt":"%s"}\n' \
+            "$(echo "${{ github.sha }}" | cut -c1-8)" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/version.json
+          cat dist/version.json
+
       - name: Add SPA fallback
         # GitHub Pages has no rewrite rules. It does serve 404.html for any
         # unknown path, so an exact copy of index.html there makes the client

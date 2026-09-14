@@ -5,6 +5,19 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   /**
+   * The build's identity, baked in at compile time.
+   *
+   * The running app compares this against a version file fetched from the
+   * server to notice it is out of date. CI supplies the commit SHA; a local
+   * build just says "dev".
+   */
+  define: {
+    __BUILD_ID__: JSON.stringify(
+      process.env.GITHUB_SHA?.slice(0, 8) ?? 'dev',
+    ),
+  },
+
+  /**
    * Where the app's assets are served from.
    *
    * Netlify and Vercel serve at the domain root, so the default "/" is right.

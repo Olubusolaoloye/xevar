@@ -6,6 +6,7 @@ import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
 import { CommandPalette } from './CommandPalette';
+import { UpdateBanner } from './UpdateBanner';
 
 export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -60,6 +61,7 @@ export function AppShell() {
 
       <MobileNav />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <UpdateBanner />
     </div>
   );
 }
