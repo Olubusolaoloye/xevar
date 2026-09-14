@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { LogOut, Mail, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { KeyRound, LogOut, Mail, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { hasBackend } from '@/lib/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
+import { ChangePassword } from '@/components/admin/ChangePassword';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Panel } from '@/components/ui/Panel';
@@ -9,9 +10,9 @@ import { Panel } from '@/components/ui/Panel';
 /**
  * Admin sign-in.
  *
- * A magic link rather than a password: there is no secret to store, transmit,
- * reuse or leak, and a link that expires is a smaller target than a password
- * that does not.
+ * Email and password, with a magic link kept as the secondary path. The link
+ * is not decoration: it is the only way back in if the password is forgotten,
+ * since nobody here can reset it for you.
  *
  * The important part is what is NOT here. This component decides what to
  * render; it does not decide who may write. That is enforced by row-level
@@ -19,9 +20,11 @@ import { Panel } from '@/components/ui/Panel';
  * would still have every write rejected by the database.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const { email, isAdmin, ready, init, signIn, signOut } = useAuthStore();
+  const { email, isAdmin, ready, init, signInWithPassword, sendLink, signOut } =
+    useAuthStore();
 
   const [value, setValue] = useState('');
+  const [password, setPassword] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +72,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
             Sign out
           </Button>
         </div>
+        <ChangePassword />
         {children}
       </>
     );
@@ -77,7 +81,23 @@ export function AdminGate({ children }: { children: ReactNode }) {
   const submit = async () => {
     setBusy(true);
     setError(null);
-    const result = await signIn(value);
+    const result = await signInWithPassword(value, password);
+    setBusy(false);
+
+    if (!result.ok) {
+      setError(result.error ?? 'Could not sign in.');
+      return;
+    }
+    // No success state to set: onAuthStateChange re-renders this component as
+    // the admin view the moment the session lands.
+  };
+
+  const canSignIn = !busy && value.trim().length >= 3 && password.length > 0;
+
+  const emailLink = async () => {
+    setBusy(true);
+    setError(null);
+    const result = await sendLink(value);
     setBusy(false);
 
     if (!result.ok) {
@@ -124,9 +144,26 @@ export function AdminGate({ children }: { children: ReactNode }) {
                     setValue(e.target.value);
                     setError(null);
                   }}
-                  onKeyDown={(e) => e.key === 'Enter' && void submit()}
                   icon={<Mail className="h-3.5 w-3.5" />}
                   placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="admin-password" className="mb-1.5 block text-xs font-medium text-ink-mid">
+                  Password
+                </label>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && canSignIn && void submit()}
+                  icon={<KeyRound className="h-3.5 w-3.5" />}
                 />
               </div>
 
@@ -140,11 +177,20 @@ export function AdminGate({ children }: { children: ReactNode }) {
                 variant="primary"
                 size="lg"
                 className="w-full"
-                disabled={busy || value.trim().length < 3}
+                disabled={!canSignIn}
                 onClick={() => void submit()}
               >
-                {busy ? 'Sending…' : 'Email me a sign-in link'}
+                {busy ? 'Signing in…' : 'Sign in'}
               </Button>
+
+              <button
+                type="button"
+                disabled={busy || value.trim().length < 3}
+                onClick={() => void emailLink()}
+                className="w-full text-center text-[11px] text-ink-dim transition-colors hover:text-ink-mid disabled:opacity-40"
+              >
+                Forgot it? Email me a sign-in link instead
+              </button>
             </>
           )}
 

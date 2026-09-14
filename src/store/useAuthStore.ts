@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { hasBackend, supabase, IS_ADMIN_RPC } from '@/lib/supabase';
 
+/** Shortest password this form will submit. Supabase enforces its own floor
+ *  server-side too; this is the stricter of the two, checked early so the user
+ *  finds out before a round trip. */
+export const MIN_PASSWORD_LENGTH = 10;
+
 interface AuthState {
   email: string | null;
   /** True once the initial session lookup has finished. */
@@ -15,7 +20,12 @@ interface AuthState {
   isAdmin: boolean;
 
   init: () => void;
-  signIn: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  signInWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
+  sendLink: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  changePassword: (password: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -52,7 +62,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     unsubscribe = () => listener.subscription.unsubscribe();
   },
 
-  signIn: async (email) => {
+  signInWithPassword: async (email, password) => {
+    if (!supabase) return { ok: false, error: 'No backend is configured.' };
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (error) {
+      // One message for both a wrong address and a wrong password. Saying
+      // which was wrong would confirm whether an account exists, turning this
+      // form into an account-enumeration oracle.
+      return { ok: false, error: 'Wrong email or password.' };
+    }
+    return { ok: true };
+  },
+
+  sendLink: async (email) => {
     if (!supabase) return { ok: false, error: 'No backend is configured.' };
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -68,12 +95,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     if (error) {
-      // Deliberately vague: confirming which addresses exist would turn this
-      // form into an account-enumeration oracle.
       return {
         ok: false,
         error: 'Could not send a sign-in link. Check the address and try again.',
       };
+    }
+    return { ok: true };
+  },
+
+  changePassword: async (password) => {
+    if (!supabase) return { ok: false, error: 'No backend is configured.' };
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return {
+        ok: false,
+        error: `Use at least ${MIN_PASSWORD_LENGTH} characters.`,
+      };
+    }
+
+    // Acts on the caller's own session — there is no user id to pass and no
+    // way to aim this at another account.
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      // Surfaced as-is: this one is not an enumeration risk (you are already
+      // signed in) and the reason is usually actionable, e.g. a password the
+      // server rejected as too weak or one already in use.
+      return { ok: false, error: error.message };
     }
     return { ok: true };
   },
