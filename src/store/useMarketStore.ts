@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { MarketFeed } from '@/data/feed';
-import { generatePairs } from '@/data/sources/mock';
+import { useRegistryStore } from '@/store/useRegistryStore';
 import type { FeedStatus, Pair } from '@/data/types';
 
 interface MarketState {
@@ -10,6 +10,8 @@ interface MarketState {
   updatedAt: number;
   start: () => void;
   stop: () => void;
+  /** Pull a fresh board immediately, outside the poll schedule. */
+  refresh: () => void;
 }
 
 /**
@@ -19,11 +21,12 @@ interface MarketState {
  */
 let feed: MarketFeed | null = null;
 let subscribers = 0;
+let unsubscribeRegistry: (() => void) | null = null;
 
 export const useMarketStore = create<MarketState>((set) => ({
-  // Seeded board is available synchronously, so the first paint has real
-  // content rather than a wall of skeletons.
-  pairs: generatePairs(),
+  // Starts empty: the board is whatever the user tracks, and inventing
+  // placeholder tokens would put fake prices beside their real ones.
+  pairs: [],
   status: 'connecting',
   updatedAt: Date.now(),
 
@@ -36,14 +39,24 @@ export const useMarketStore = create<MarketState>((set) => ({
       (status) => set({ status }),
     );
     feed.start();
+
+    // Editing the tracked-token list must change the board straight away
+    // rather than waiting out the poll interval.
+    unsubscribeRegistry = useRegistryStore.subscribe((state, previous) => {
+      if (state.tokens !== previous.tokens) feed?.refresh();
+    });
   },
 
   stop: () => {
     subscribers = Math.max(0, subscribers - 1);
     if (subscribers > 0 || !feed) return;
+    unsubscribeRegistry?.();
+    unsubscribeRegistry = null;
     feed.stop();
     feed = null;
   },
+
+  refresh: () => feed?.refresh(),
 }));
 
 /** Look up a single pair by id. */

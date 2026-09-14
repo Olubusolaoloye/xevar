@@ -191,6 +191,9 @@ export function PairDetail() {
               {pair.trendingRank && (
                 <Badge tone="warn">#{pair.trendingRank} trending</Badge>
               )}
+              {pair.tracked && !pair.tracked.pinned && (
+                <Badge tone="warn">Unverified ticker match</Badge>
+              )}
             </div>
 
             <p className="mt-1 truncate text-sm text-ink-low">

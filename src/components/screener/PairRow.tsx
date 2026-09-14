@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Zap } from 'lucide-react';
+import { ShieldAlert, Star, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatAge, formatCompact, formatCount } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -64,6 +64,14 @@ function PairRowBase({ pair, rank, timeframe, compact }: PairRowProps) {
               <span className="shrink-0 text-xs text-ink-dim">
                 /{pair.quoteToken.symbol}
               </span>
+              {pair.tracked && !pair.tracked.pinned && (
+                <Tooltip content="Matched by ticker only — another token could share this symbol. Pin its contract address in Admin to confirm.">
+                  <span className="inline-flex items-center gap-0.5 rounded-xs bg-warn/12 px-1 text-[9px] font-bold uppercase text-warn">
+                    <ShieldAlert className="h-2.5 w-2.5" />
+                    Unverified
+                  </span>
+                </Tooltip>
+              )}
               {pair.boosts > 0 && (
                 <Tooltip content={`${pair.boosts} boosts`}>
                   <span className="inline-flex items-center gap-0.5 rounded-xs bg-warn/12 px-1 text-[9px] font-bold text-warn">
