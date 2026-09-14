@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils';
 /**
  * The PanScreener mark.
  *
- * A scanning aperture over a rising series: the left bracket and right bracket
- * frame three ascending bars, reading simultaneously as a viewfinder (the
- * "screening") and as a chart (the subject). It resolves cleanly at 16px, which
- * is the only size test a mark has to pass.
+ * A scanning aperture over a rising series, reading simultaneously as a
+ * viewfinder (the "screening") and as a chart (the subject). The crimson frame
+ * around a golden field mirrors the construction of the Blin brand artwork.
+ * It resolves cleanly at 16px, which is the only size test a mark has to pass.
  */
 export function LogoMark({ className, size = 28 }: { className?: string; size?: number }) {
   const gradientId = useId();
@@ -36,9 +36,9 @@ export function LogoMark({ className, size = 28 }: { className?: string; size?: 
         width="29.5"
         height="29.5"
         rx="8.75"
-        style={{ stroke: `url(#${gradientId})` }}
+        stroke="var(--color-accent-500)"
         strokeWidth="2.5"
-        opacity="0.55"
+        opacity="0.85"
       />
 
       {/* Ascending series */}

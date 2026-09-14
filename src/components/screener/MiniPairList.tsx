@@ -46,7 +46,12 @@ export function MiniPairList({
               {index + 1}
             </span>
 
-            <TokenAvatar symbol={pair.baseToken.symbol} chain={pair.chain} size="sm" />
+            <TokenAvatar
+              symbol={pair.baseToken.symbol}
+              chain={pair.chain}
+              src={pair.imageUrl}
+              size="sm"
+            />
 
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-ink transition-colors group-hover:text-brand-500">

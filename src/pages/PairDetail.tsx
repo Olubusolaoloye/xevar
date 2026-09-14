@@ -32,6 +32,8 @@ import { Badge } from '@/components/ui/Badge';
 import { PriceChart } from '@/components/pair/PriceChart';
 import { TradeTape } from '@/components/pair/TradeTape';
 import { SecurityPanel } from '@/components/pair/SecurityPanel';
+import { PnlCard } from '@/components/pair/PnlCard';
+import { ProfitCalculator } from '@/components/pair/ProfitCalculator';
 import type { Pair } from '@/data/types';
 
 /** A copyable on-chain address with an explorer link. */
@@ -171,7 +173,12 @@ export function PairDetail() {
       {/* Header */}
       <div className="flex flex-col gap-4 border-b border-line pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-3.5">
-          <TokenAvatar symbol={pair.baseToken.symbol} chain={pair.chain} size="lg" />
+          <TokenAvatar
+            symbol={pair.baseToken.symbol}
+            chain={pair.chain}
+            src={pair.imageUrl}
+            size="lg"
+          />
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -281,6 +288,14 @@ export function PairDetail() {
         </div>
 
         <div className="space-y-4">
+          <Panel className="overflow-hidden" elevation="raised">
+            <PnlCard pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ProfitCalculator pair={pair} />
+          </Panel>
+
           <Panel className="overflow-hidden">
             <PanelHeader title="Performance" />
             <ChangeGrid pair={pair} />
@@ -311,7 +326,7 @@ export function PairDetail() {
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-[11px] text-ink-low">Makers (24h)</span>
                 <span className="tnum font-mono text-[11px] text-ink-mid">
-                  {formatCompact(pair.makers24h)}
+                  {pair.makers24h < 0 ? '—' : formatCompact(pair.makers24h)}
                 </span>
               </div>
               <div className="flex items-center justify-between px-4 py-2.5">

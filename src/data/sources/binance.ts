@@ -11,7 +11,8 @@
  * exponential backoff and throttles how often it wakes the UI.
  */
 
-import type { FeedStatus } from '../types';
+/** Connection state of this socket alone — distinct from the board's status. */
+export type SocketStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
 
 export interface Ticker {
   /** Base asset symbol, already stripped of the USDT suffix, e.g. `"ETH"`. */
@@ -22,7 +23,7 @@ export interface Ticker {
 }
 
 type TickerHandler = (tickers: Map<string, Ticker>) => void;
-type StatusHandler = (status: FeedStatus) => void;
+type StatusHandler = (status: SocketStatus) => void;
 
 const STREAM_URL = 'wss://stream.binance.com:9443/ws/!ticker@arr';
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CHAINS } from '@/data/chains';
 import type { ChainId } from '@/data/types';
@@ -8,6 +8,8 @@ interface TokenAvatarProps {
   chain?: ChainId;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /** Real logo from the market provider, when it has one. */
+  src?: string;
 }
 
 const SIZES = {
@@ -19,12 +21,14 @@ const SIZES = {
 /**
  * Identity mark for a token.
  *
- * Real logo URLs for long-tail DEX tokens are unreliable — most 404, and a grid
- * of broken images looks far worse than no images at all. Instead each token
- * gets a deterministic gradient derived from its own symbol, so the same token
- * always looks the same and adjacent rows stay visually distinct.
+ * Uses the provider's logo when one exists, and falls back to a deterministic
+ * gradient derived from the symbol itself. Long-tail DEX token logos are
+ * unreliable — plenty 404 — and a grid of broken images looks far worse than
+ * none, so a failed load silently reverts to the generated mark rather than
+ * leaving a hole.
  */
-export function TokenAvatar({ symbol, chain, size = 'md', className }: TokenAvatarProps) {
+export function TokenAvatar({ symbol, chain, size = 'md', className, src }: TokenAvatarProps) {
+  const [failed, setFailed] = useState(false);
   const gradient = useMemo(() => {
     let hash = 0;
     for (let i = 0; i < symbol.length; i++) {
@@ -39,17 +43,30 @@ export function TokenAvatar({ symbol, chain, size = 'md', className }: TokenAvat
 
   return (
     <span className={cn('relative inline-flex shrink-0', className)}>
-      <span
-        style={{ backgroundImage: gradient }}
-        className={cn(
-          'inline-flex items-center justify-center rounded-full',
-          'font-display font-bold uppercase tracking-tight text-white/95',
-          'ring-1 ring-inset ring-white/12',
-          sizing.box,
-        )}
-      >
-        {symbol.slice(0, 3)}
-      </span>
+      {src && !failed ? (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className={cn(
+            'rounded-full object-cover ring-1 ring-inset ring-white/12',
+            sizing.box,
+          )}
+        />
+      ) : (
+        <span
+          style={{ backgroundImage: gradient }}
+          className={cn(
+            'inline-flex items-center justify-center rounded-full',
+            'font-display font-bold uppercase tracking-tight text-white/95',
+            'ring-1 ring-inset ring-white/12',
+            sizing.box,
+          )}
+        >
+          {symbol.slice(0, 3)}
+        </span>
+      )}
 
       {chain && (
         <span

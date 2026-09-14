@@ -92,8 +92,8 @@ function Hero() {
         aria-hidden="true"
       />
       <div
-        className="aurora pointer-events-none absolute -right-24 top-10 h-[360px] w-[360px] rounded-full opacity-15 blur-[110px]"
-        style={{ background: 'var(--color-chain-base)', animationDelay: '-9s' }}
+        className="aurora pointer-events-none absolute -right-24 top-10 h-[360px] w-[360px] rounded-full opacity-20 blur-[110px]"
+        style={{ background: 'var(--color-accent-500)', animationDelay: '-9s' }}
         aria-hidden="true"
       />
       {/* Fade the backdrop into the page below. */}

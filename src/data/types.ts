@@ -48,6 +48,15 @@ export interface TxnCounts {
  * UI is explicit that these are heuristics rather than an audit.
  */
 export interface SecuritySignals {
+  /**
+   * Whether these signals are actually known.
+   *
+   * The public market APIs expose no contract-safety data. Rendering a
+   * fabricated "liquidity locked" pass on a real token would be worse than
+   * showing nothing, so when this is false the UI states plainly that the
+   * checks are unavailable rather than showing a pass or a fail.
+   */
+  available: boolean;
   liquidityLocked: boolean;
   /** Percentage of liquidity locked or burned, 0–100. */
   liquidityLockedPct: number;
@@ -79,7 +88,7 @@ export interface Pair {
   volume: Windowed<number>;
   txns: Windowed<TxnCounts>;
 
-  /** Distinct trading addresses over 24h. */
+  /** Distinct trading addresses over 24h. `-1` means the source doesn't report it. */
   makers24h: number;
   liquidityUsd: number;
   fdv: number;
@@ -103,6 +112,9 @@ export interface Pair {
     twitter?: string;
     telegram?: string;
   };
+
+  /** Token logo from the provider, when it has one. */
+  imageUrl?: string;
 }
 
 /** A single fill on the tape. */
@@ -220,5 +232,17 @@ export interface ScreenerQuery extends ScreenerFilters {
   timeframe: Timeframe;
 }
 
-/** Connection state of the live feed, surfaced in the top bar. */
-export type FeedStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
+/**
+ * State of the market feed, surfaced in the top bar.
+ *
+ * `stale` is the important one: the last refresh failed, so the board is
+ * showing cached values rather than live ones. Saying so is the whole point —
+ * presenting a cached price as live is the one thing a market app must never
+ * do.
+ */
+export type FeedStatus =
+  | 'connecting'
+  | 'live'
+  | 'stale'
+  | 'seeded'
+  | 'offline';
