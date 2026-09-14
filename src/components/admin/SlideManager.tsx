@@ -9,7 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAdminStore, type AdSlide } from '@/store/useAdminStore';
+import { adminBackend, useAdminStore, type AdSlide } from '@/store/useAdminStore';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -105,10 +105,10 @@ function SlideForm({
 /** Manage the hero carousel's slides. */
 export function SlideManager() {
   const slides = useAdminStore((s) => s.slides);
-  const addSlide = useAdminStore((s) => s.addSlide);
-  const updateSlide = useAdminStore((s) => s.updateSlide);
-  const removeSlide = useAdminStore((s) => s.removeSlide);
-  const moveSlide = useAdminStore((s) => s.moveSlide);
+  const addSlide = adminBackend.addSlide;
+  const updateSlide = adminBackend.updateSlide;
+  const removeSlide = adminBackend.removeSlide;
+  const moveSlide = adminBackend.moveSlide;
 
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);

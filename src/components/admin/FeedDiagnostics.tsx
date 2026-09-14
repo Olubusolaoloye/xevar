@@ -3,6 +3,7 @@ import { Activity, Download, RefreshCw, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatAge } from '@/lib/format';
 import { useMarketStore } from '@/store/useMarketStore';
+import { hasBackend } from '@/lib/supabase';
 import { useAdminStore } from '@/store/useAdminStore';
 import { useListingStore, type Listing } from '@/store/useListingStore';
 import { Button } from '@/components/ui/Button';

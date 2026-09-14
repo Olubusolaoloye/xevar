@@ -4,6 +4,7 @@ import { formatCompact, truncateAddress } from '@/lib/format';
 import { CHAIN_LIST } from '@/data/chains';
 import { useTokenSearch } from '@/hooks/useTokenSearch';
 import {
+  listingBackend,
   CATEGORY_LABEL,
   useListingStore,
   type TokenCategory,
@@ -27,7 +28,7 @@ const CATEGORIES = Object.keys(CATEGORY_LABEL) as TokenCategory[];
  * specific asset that cannot later resolve to an impostor.
  */
 export function AddTokenPanel() {
-  const add = useListingStore((s) => s.add);
+  const add = listingBackend.add;
 
   const [query, setQuery] = useState('');
   const [chain, setChain] = useState<ChainId | ''>('');
@@ -40,8 +41,8 @@ export function AddTokenPanel() {
     chain || undefined,
   );
 
-  const addFromResult = (pair: Pair) => {
-    const result = add({
+  const addFromResult = async (pair: Pair) => {
+    const result = await add({
       chain: pair.chain,
       address: pair.baseToken.address,
       symbol: pair.baseToken.symbol,
@@ -174,7 +175,7 @@ export function AddTokenPanel() {
                 <Button
                   size="sm"
                   variant={added === pair.baseToken.address ? 'primary' : 'outline'}
-                  onClick={() => addFromResult(pair)}
+                  onClick={() => void addFromResult(pair)}
                   className="shrink-0"
                 >
                   {added === pair.baseToken.address ? (
