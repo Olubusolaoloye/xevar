@@ -69,16 +69,32 @@ The repo ships config for both major static hosts. Both build with
 `npm run build`, publish `dist`, and — critically — rewrite every path to
 `index.html`, without which a client-side route 404s on refresh.
 
-```bash
-# Netlify
-npx netlify-cli deploy --build --prod
+### GitHub Pages (no setup beyond one toggle)
 
-# Vercel
-npx vercel --prod
+`.github/workflows/deploy.yml` builds and publishes on every push to `main`.
+Enable it once: **Settings → Pages → Source → GitHub Actions**. The site then
+lives at `https://<owner>.github.io/<repo>/`.
+
+Two details that the workflow handles and that break a Vite SPA on Pages
+otherwise:
+
+- Project sites are served from `/<repo>/`, not the domain root, so the build
+  runs with `VITE_BASE` set and the router takes its `basename` from it.
+  Without both, either the assets 404 or no route ever matches.
+- Pages has no rewrite rules, so the workflow copies `index.html` to
+  `404.html`. Pages serves that for any unknown path, which is what lets a
+  deep link like `/screener` boot the app instead of showing a 404.
+
+### Netlify or Vercel
+
+```bash
+npx netlify-cli deploy --build --prod   # Netlify
+npx vercel --prod                       # Vercel
 ```
 
 Or point either host's dashboard at this repo; the committed config is picked
-up automatically and every push to `main` redeploys.
+up automatically and every push to `main` redeploys. Both serve from the domain
+root, so no `VITE_BASE` is needed.
 
 ## Architecture
 

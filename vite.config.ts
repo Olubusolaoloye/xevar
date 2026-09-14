@@ -4,6 +4,15 @@ import path from 'node:path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  /**
+   * Where the app's assets are served from.
+   *
+   * Netlify and Vercel serve at the domain root, so the default "/" is right.
+   * GitHub Pages serves a project site from /<repo>/, and without a matching
+   * base every script and stylesheet resolves to the wrong path and 404s.
+   */
+  base: process.env.VITE_BASE || '/',
+
   plugins: [react(), tailwindcss()],
 
   resolve: {
