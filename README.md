@@ -107,10 +107,15 @@ purpose (see the comments in that file for why that is safe).
 The schema lives in `supabase/001_panscreener.sql`, which is already applied.
 Re-running it is harmless; it is written to be idempotent.
 
-**One manual step, if magic-link sign-in fails**
+**Signing in**
 
-Supabase only mails a sign-in link to a redirect URL you have allowlisted. In
-the dashboard under **Authentication → URL Configuration**, add both:
+Email and password at `/admin`. A magic link is kept as the secondary path,
+because it is the only way back in if the password is forgotten — there is no
+reset flow and no one who can reset it for you. The password can be changed
+from the admin header once signed in.
+
+For the link path to work, its redirect URL must be allowlisted in the
+dashboard under **Authentication → URL Configuration**:
 
 - `https://olubusolaoloye.github.io/xevar/admin` — the deployed site
 - `http://localhost:5173/admin` — local development
@@ -122,7 +127,7 @@ not in the app: every write policy calls `ps_is_admin()`, which checks the
 `ps_admin_allowlist` table. That table has row-level security on and *no
 policies at all*, so it cannot be read or written through the API by anyone —
 not even the admin. Moving admin rights means editing that row from the
-dashboard. Signing in is a magic link; there is no password.
+dashboard.
 
 Every object this app owns is prefixed `ps_`, because the project also hosts
 another app in the same schema. Without the prefix, `create table if not
