@@ -29,7 +29,8 @@ jobs:
         run: npm test
 
       - name: Build
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        # Backend values come from the committed .env.production. They are not
+        # passed as repository variables: an unset variable expands to an empty
+        # string, which Vite would treat as a real value and use to override the
+        # file — producing a green build with the backend silently switched off.
         run: npx vite build

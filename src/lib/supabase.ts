@@ -36,6 +36,24 @@ export const supabase = hasBackend
     })
   : null;
 
+/**
+ * Table and function names, defined once.
+ *
+ * Every name carries a `ps_` prefix because a Supabase project can host more
+ * than one app in the same `public` schema, and bare names like `listings` or
+ * `is_admin` are exactly the names a second app would claim too. Keeping them
+ * here rather than inline means the prefix cannot drift out of step with
+ * supabase/001_panscreener.sql one call site at a time.
+ */
+export const TABLES = {
+  listings: 'ps_listings',
+  adSlides: 'ps_ad_slides',
+  appSettings: 'ps_app_settings',
+} as const;
+
+/** The server-side admin check. Admin status is never decided in the client. */
+export const IS_ADMIN_RPC = 'ps_is_admin';
+
 /** Row shapes, mirroring supabase/001_panscreener.sql. */
 export interface ListingRow {
   id: string;

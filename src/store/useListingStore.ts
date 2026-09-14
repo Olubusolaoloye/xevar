@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { hasBackend, supabase, type ListingRow } from '@/lib/supabase';
+import { hasBackend, supabase, TABLES, type ListingRow } from '@/lib/supabase';
 import type { ChainId } from '@/data/types';
 
 export type TokenCategory = 'meme' | 'defi' | 'infra' | 'stable' | 'other';
@@ -235,7 +235,7 @@ export function startListingSync() {
 
   const load = async () => {
     const { data, error } = await supabase!
-      .from('listings')
+      .from(TABLES.listings)
       .select('*')
       .order('position', { ascending: true });
 
@@ -253,7 +253,7 @@ export function startListingSync() {
     .channel('listings-sync')
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'listings' },
+      { event: '*', schema: 'public', table: TABLES.listings },
       () => void load(),
     )
     .subscribe();
@@ -274,7 +274,7 @@ export const listingBackend = {
 
     const count = useListingStore.getState().tokens.length;
     const { error } = await supabase
-      .from('listings')
+      .from(TABLES.listings)
       .insert({ ...toRow(token), position: count });
 
     if (error) {
@@ -292,12 +292,12 @@ export const listingBackend = {
 
   async update(id: string, patch: Partial<Listing>) {
     if (!supabase) return useListingStore.getState().update(id, patch);
-    await supabase.from('listings').update(toRow(patch)).eq('id', id);
+    await supabase.from(TABLES.listings).update(toRow(patch)).eq('id', id);
   },
 
   async remove(id: string) {
     if (!supabase) return useListingStore.getState().remove(id);
-    await supabase.from('listings').delete().eq('id', id);
+    await supabase.from(TABLES.listings).delete().eq('id', id);
   },
 
   async move(id: string, direction: -1 | 1) {
@@ -312,8 +312,8 @@ export const listingBackend = {
 
     // Swap the two positions in one round trip.
     await Promise.all([
-      supabase.from('listings').update({ position: target }).eq('id', ordered[index].id),
-      supabase.from('listings').update({ position: index }).eq('id', ordered[target].id),
+      supabase.from(TABLES.listings).update({ position: target }).eq('id', ordered[index].id),
+      supabase.from(TABLES.listings).update({ position: index }).eq('id', ordered[target].id),
     ]);
   },
 };

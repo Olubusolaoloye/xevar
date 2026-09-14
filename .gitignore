@@ -4,5 +4,9 @@ build/
 coverage/
 *.log
 .env*
+# ...except the production backend values, which are public by design and have
+# to ship with the repo for a clean checkout to build against the real backend.
+# See the comments in the file itself.
+!.env.production
 .DS_Store
 .vscode/

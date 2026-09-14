@@ -36,10 +36,10 @@ jobs:
         # asset base has to match or every script and stylesheet 404s.
         env:
           VITE_BASE: /${{ github.event.repository.name }}/
-          # Public values — see .env.example. Stored as repository variables so
-          # they can be rotated without a code change.
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        # Backend values come from the committed .env.production — see the
+        # comments there. Deliberately not repository variables: an unset
+        # variable expands to an empty string that would override the file and
+        # ship a build with no backend, with nothing in the log to say so.
         run: npm run build
 
       - name: Write build version

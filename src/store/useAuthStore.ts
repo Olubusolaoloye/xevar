@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { hasBackend, supabase } from '@/lib/supabase';
+import { hasBackend, supabase, IS_ADMIN_RPC } from '@/lib/supabase';
 
 interface AuthState {
   email: string | null;
@@ -38,7 +38,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Ask Postgres whether this session is the admin. Deciding it here from
       // the email string would be a client-side check that a modified bundle
       // could flip; the database function is authoritative.
-      const { data, error } = await supabase.rpc('is_admin');
+      const { data, error } = await supabase.rpc(IS_ADMIN_RPC);
       set({ email, isAdmin: error ? false : Boolean(data), ready: true });
     };
 

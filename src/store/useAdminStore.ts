@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { hasBackend, supabase, type AdSlideRow, type AppSettingsRow } from '@/lib/supabase';
+import { hasBackend, supabase, TABLES, type AdSlideRow, type AppSettingsRow } from '@/lib/supabase';
 
 /**
  * A slide in the hero carousel.
@@ -204,7 +204,7 @@ export function startAdminSync() {
 
   const loadSlides = async () => {
     const { data, error } = await supabase!
-      .from('ad_slides')
+      .from(TABLES.adSlides)
       .select('*')
       .order('position', { ascending: true });
     if (error || !data) return;
@@ -213,7 +213,7 @@ export function startAdminSync() {
 
   const loadSettings = async () => {
     const { data, error } = await supabase!
-      .from('app_settings')
+      .from(TABLES.appSettings)
       .select('*')
       .eq('id', 1)
       .maybeSingle();
@@ -235,13 +235,13 @@ export function startAdminSync() {
 
   slideChannel = supabase
     .channel('slides-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'ad_slides' },
+    .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.adSlides },
         () => void loadSlides())
     .subscribe();
 
   settingsChannel = supabase
     .channel('settings-sync')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' },
+    .on('postgres_changes', { event: '*', schema: 'public', table: TABLES.appSettings },
         () => void loadSettings())
     .subscribe();
 }
@@ -264,17 +264,17 @@ export const adminBackend = {
   async addSlide(slide: Omit<AdSlide, 'id' | 'order'>) {
     if (!supabase) return useAdminStore.getState().addSlide(slide);
     const count = useAdminStore.getState().slides.length;
-    await supabase.from('ad_slides').insert({ ...slideToRow(slide), position: count });
+    await supabase.from(TABLES.adSlides).insert({ ...slideToRow(slide), position: count });
   },
 
   async updateSlide(id: string, patch: Partial<AdSlide>) {
     if (!supabase) return useAdminStore.getState().updateSlide(id, patch);
-    await supabase.from('ad_slides').update(slideToRow(patch)).eq('id', id);
+    await supabase.from(TABLES.adSlides).update(slideToRow(patch)).eq('id', id);
   },
 
   async removeSlide(id: string) {
     if (!supabase) return useAdminStore.getState().removeSlide(id);
-    await supabase.from('ad_slides').delete().eq('id', id);
+    await supabase.from(TABLES.adSlides).delete().eq('id', id);
   },
 
   async moveSlide(id: string, direction: -1 | 1) {
@@ -286,8 +286,8 @@ export const adminBackend = {
     if (index < 0 || target < 0 || target >= ordered.length) return;
 
     await Promise.all([
-      supabase.from('ad_slides').update({ position: target }).eq('id', ordered[index].id),
-      supabase.from('ad_slides').update({ position: index }).eq('id', ordered[target].id),
+      supabase.from(TABLES.adSlides).update({ position: target }).eq('id', ordered[index].id),
+      supabase.from(TABLES.adSlides).update({ position: index }).eq('id', ordered[target].id),
     ]);
   },
 
@@ -297,12 +297,12 @@ export const adminBackend = {
     if (patch.name !== undefined) row.verdict_name = patch.name;
     if (patch.urlTemplate !== undefined) row.verdict_url_template = patch.urlTemplate;
     if (patch.enabled !== undefined) row.verdict_enabled = patch.enabled;
-    await supabase.from('app_settings').update(row).eq('id', 1);
+    await supabase.from(TABLES.appSettings).update(row).eq('id', 1);
   },
 
   async setPollSeconds(seconds: number) {
     const clamped = Math.min(120, Math.max(10, Math.round(seconds)));
     if (!supabase) return useAdminStore.getState().setPollSeconds(clamped);
-    await supabase.from('app_settings').update({ poll_seconds: clamped }).eq('id', 1);
+    await supabase.from(TABLES.appSettings).update({ poll_seconds: clamped }).eq('id', 1);
   },
 };
