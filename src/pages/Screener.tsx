@@ -42,6 +42,7 @@ export function Screener() {
 
   return (
     <div className="flex flex-col">
+      <h1 className="sr-only">Screener</h1>
       <TrendingBar />
 
       <div className="flex min-h-0 flex-1">

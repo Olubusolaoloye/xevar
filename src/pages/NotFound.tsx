@@ -6,9 +6,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 export function NotFound() {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center px-4 py-24">
-      <p className="font-display text-6xl font-bold tracking-tight text-line-strong">
+      <h1 className="font-display text-6xl font-bold tracking-tight text-line-strong">
         404
-      </p>
+      </h1>
       <EmptyState
         icon={<Compass className="h-5 w-5" />}
         title="This page does not exist"
