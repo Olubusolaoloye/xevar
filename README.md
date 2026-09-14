@@ -96,27 +96,42 @@ Or point either host's dashboard at this repo; the committed config is picked
 up automatically and every push to `main` redeploys. Both serve from the domain
 root, so no `VITE_BASE` is needed.
 
-## Backend (optional)
+## Backend
 
-Without a backend PanScreener runs entirely in the browser and admin settings
-stay local to one device. Point it at Supabase and listings, adverts and
-settings become global: one admin edits them, everyone sees the change, live.
+PanScreener is wired to a live Supabase project. Listings, adverts and settings
+are global: the admin edits them once and every visitor on every device sees the
+change, live over a websocket. No setup is needed to run or deploy the app —
+`.env.production` carries the connection values, and they are committed on
+purpose (see the comments in that file for why that is safe).
 
-**Setup, once:**
+The schema lives in `supabase/001_panscreener.sql`, which is already applied.
+Re-running it is harmless; it is written to be idempotent.
 
-1. Create a Supabase project (free).
-2. Open the SQL editor and run `supabase/001_panscreener.sql`. It creates the
-   tables, the row-level-security policies, and seeds the starting listings.
-3. Authentication → Providers → enable **Email**, and turn *Confirm email* on.
-   Under URL Configuration add your site URL to the redirect allowlist.
-4. Authentication → Users → invite the admin address. The SQL allowlists
-   `devolufinodiv@gmail.com`; change the `admin_allowlist` row to move it.
-5. Project Settings → API: copy the URL and the publishable (anon) key into
-   `.env` locally, and into the repository's Actions **variables** for deploys.
+**One manual step, if magic-link sign-in fails**
 
-Both values are public by design. The anon key grants only what the policies
-allow, and those live in Postgres — a modified bundle cannot write past them.
-The `service_role` key is a real secret and must never reach the client.
+Supabase only mails a sign-in link to a redirect URL you have allowlisted. In
+the dashboard under **Authentication → URL Configuration**, add both:
+
+- `https://olubusolaoloye.github.io/xevar/admin` — the deployed site
+- `http://localhost:5173/admin` — local development
+
+**Who the admin is**
+
+`devolufinodiv@gmail.com`, and only that address. It is enforced in Postgres,
+not in the app: every write policy calls `ps_is_admin()`, which checks the
+`ps_admin_allowlist` table. That table has row-level security on and *no
+policies at all*, so it cannot be read or written through the API by anyone —
+not even the admin. Moving admin rights means editing that row from the
+dashboard. Signing in is a magic link; there is no password.
+
+Every object this app owns is prefixed `ps_`, because the project also hosts
+another app in the same schema. Without the prefix, `create table if not
+exists listings` would adopt the neighbour's table and `create or replace
+function is_admin()` would silently overwrite its authorization logic.
+
+The publishable key in `.env.production` is not a secret — it grants exactly
+what the policies allow. The `service_role` key is a real secret and must never
+reach the client.
 
 **What is global vs local**
 
