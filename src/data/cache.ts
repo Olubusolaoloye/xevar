@@ -9,7 +9,12 @@
  */
 
 interface Entry<T> {
-  value: T;
+  /**
+   * Present only once a load has succeeded. `hasValue` distinguishes "not
+   * loaded yet" from "loaded a value that happens to be undefined".
+   */
+  hasValue: boolean;
+  value?: T;
   /** When the value was written. */
   storedAt: number;
   /** In-flight refresh, so concurrent callers share one request. */
@@ -58,29 +63,43 @@ export async function cached<T>(
   const entry = store.get(key) as Entry<T> | undefined;
   const now = Date.now();
 
-  if (entry) {
+  if (entry?.hasValue) {
     const age = now - entry.storedAt;
-    if (age < freshMs) return { value: entry.value, stale: false, ageMs: age };
+    if (age < freshMs) return { value: entry.value as T, stale: false, ageMs: age };
   }
 
-  // Collapse concurrent refreshes of the same key into one request.
-  const existing = entry?.inflight;
-  const request =
-    existing ??
-    loader()
+  // Share one request across concurrent callers. This has to cover the cold
+  // case too: on first load several components ask for the same key at once,
+  // and firing a request per caller burns rate limit for no benefit.
+  let request = entry?.inflight;
+
+  if (!request) {
+    request = loader()
       .then((value) => {
-        store.set(key, { value, storedAt: Date.now() });
+        store.set(key, { hasValue: true, value, storedAt: Date.now() });
         return value;
       })
       .catch((error) => {
         // Clear only the in-flight marker; the last good value must survive.
         const current = store.get(key) as Entry<T> | undefined;
-        if (current) store.set(key, { value: current.value, storedAt: current.storedAt });
+        if (current?.hasValue) {
+          store.set(key, {
+            hasValue: true,
+            value: current.value,
+            storedAt: current.storedAt,
+          });
+        } else {
+          store.delete(key);
+        }
         throw error;
       });
 
-  if (entry && !existing) {
-    store.set(key, { ...entry, inflight: request });
+    store.set(key, {
+      hasValue: entry?.hasValue ?? false,
+      value: entry?.value,
+      storedAt: entry?.storedAt ?? 0,
+      inflight: request,
+    });
   }
 
   try {
@@ -88,10 +107,10 @@ export async function cached<T>(
     return { value, stale: false, ageMs: 0 };
   } catch (error) {
     const fallback = store.get(key) as Entry<T> | undefined;
-    const age = fallback ? Date.now() - fallback.storedAt : Infinity;
+    const age = fallback?.hasValue ? Date.now() - fallback.storedAt : Infinity;
 
-    if (fallback && age <= maxStaleMs) {
-      return { value: fallback.value, stale: true, ageMs: age };
+    if (fallback?.hasValue && age <= maxStaleMs) {
+      return { value: fallback.value as T, stale: true, ageMs: age };
     }
     throw error;
   }
@@ -99,7 +118,8 @@ export async function cached<T>(
 
 /** Read a cached value without triggering a request. */
 export function peek<T>(key: string): T | undefined {
-  return (store.get(key) as Entry<T> | undefined)?.value;
+  const entry = store.get(key) as Entry<T> | undefined;
+  return entry?.hasValue ? entry.value : undefined;
 }
 
 export function clearCache() {

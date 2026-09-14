@@ -64,12 +64,36 @@ function toChainId(slug: string): ChainId | null {
   return (CHAIN_IDS as string[]).includes(slug) ? (slug as ChainId) : null;
 }
 
-/** Their dexId is a lowercase slug; present it the way a human writes it. */
+/**
+ * Exchanges whose own casing a naive title-case would get wrong.
+ * "Pancakeswap" and "Sushiswap" are misspellings of real brands.
+ */
+const DEX_NAMES: Record<string, string> = {
+  pancakeswap: 'PancakeSwap',
+  sushiswap: 'SushiSwap',
+  uniswap: 'Uniswap',
+  quickswap: 'QuickSwap',
+  baseswap: 'BaseSwap',
+  traderjoe: 'TraderJoe',
+  balancer: 'Balancer',
+  aerodrome: 'Aerodrome',
+  raydium: 'Raydium',
+  meteora: 'Meteora',
+  orca: 'Orca',
+  camelot: 'Camelot',
+  curve: 'Curve',
+  cetus: 'Cetus',
+};
+
+/** Their dexId is a lowercase slug; present it the way the exchange writes it. */
 function prettyDex(dexId: string, labels?: string[]): string {
-  const name = dexId
-    .split(/[-_]/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  const name =
+    DEX_NAMES[dexId.toLowerCase()] ??
+    dexId
+      .split(/[-_]/)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
   const version = labels?.find((label) => /^v\d/i.test(label));
   return version ? `${name} ${version.toUpperCase()}` : name;
 }
