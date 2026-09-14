@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { hasBackend, supabase, type ListingRow } from '@/lib/supabase';
 import type { ChainId } from '@/data/types';
 
 export type TokenCategory = 'meme' | 'defi' | 'infra' | 'stable' | 'other';
@@ -163,3 +164,156 @@ export const useListingStore = create<ListingState>()(
     { name: 'panscreener.listings' },
   ),
 );
+
+
+/* -------------------------------------------------------------------------- */
+/* Backend sync                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Listings live in Postgres when a backend is configured.
+ *
+ * Everything below keeps the same store shape the components already use, so
+ * nothing downstream knows whether the data came from a database or from this
+ * browser. Without a backend the persisted local store above simply remains in
+ * charge, which keeps a fork or a fresh checkout working.
+ */
+
+function fromRow(row: ListingRow): Listing {
+  return {
+    id: row.id,
+    chain: row.chain as ChainId,
+    symbol: row.symbol,
+    address: row.address ?? undefined,
+    pairAddress: row.pair_address ?? undefined,
+    label: row.label ?? undefined,
+    category: row.category as TokenCategory,
+    note: row.note ?? undefined,
+    logoUrl: row.logo_url ?? undefined,
+    coverUrl: row.cover_url ?? undefined,
+    blurb: row.blurb ?? undefined,
+    website: row.website ?? undefined,
+    twitter: row.twitter ?? undefined,
+    telegram: row.telegram ?? undefined,
+    featured: row.featured,
+    addedAt: Date.parse(row.created_at),
+    order: row.position,
+  };
+}
+
+function toRow(token: Partial<Listing>) {
+  // Undefined is skipped so a partial update never blanks a column it was not
+  // asked to touch; null is written so a cleared field really clears.
+  const row: Record<string, unknown> = {};
+  const put = (key: string, value: unknown) => {
+    if (value !== undefined) row[key] = value === '' ? null : value;
+  };
+
+  put('chain', token.chain);
+  put('symbol', token.symbol);
+  put('address', token.address ?? null);
+  put('pair_address', token.pairAddress ?? null);
+  put('label', token.label ?? null);
+  put('category', token.category);
+  put('note', token.note ?? null);
+  put('logo_url', token.logoUrl ?? null);
+  put('cover_url', token.coverUrl ?? null);
+  put('blurb', token.blurb ?? null);
+  put('website', token.website ?? null);
+  put('twitter', token.twitter ?? null);
+  put('telegram', token.telegram ?? null);
+  put('featured', token.featured);
+  put('position', token.order);
+  return row;
+}
+
+let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+
+/** Pull the current listings and keep them in sync over a websocket. */
+export function startListingSync() {
+  if (!supabase || channel) return;
+
+  const load = async () => {
+    const { data, error } = await supabase!
+      .from('listings')
+      .select('*')
+      .order('position', { ascending: true });
+
+    // A failed load must not wipe what is already on screen.
+    if (error || !data) return;
+    useListingStore.setState({ tokens: (data as ListingRow[]).map(fromRow) });
+  };
+
+  void load();
+
+  // Realtime carries the change itself, but reloading the whole set is simpler
+  // and correct for a list this small — and it keeps ordering right after a
+  // reorder, which a per-row patch would not.
+  channel = supabase
+    .channel('listings-sync')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'listings' },
+      () => void load(),
+    )
+    .subscribe();
+}
+
+export function stopListingSync() {
+  if (!supabase || !channel) return;
+  void supabase.removeChannel(channel);
+  channel = null;
+}
+
+/** Writes go to the database when there is one, else to the local store. */
+export const listingBackend = {
+  enabled: hasBackend,
+
+  async add(token: Omit<Listing, 'id' | 'addedAt' | 'order'>) {
+    if (!supabase) return useListingStore.getState().add(token);
+
+    const count = useListingStore.getState().tokens.length;
+    const { error } = await supabase
+      .from('listings')
+      .insert({ ...toRow(token), position: count });
+
+    if (error) {
+      // The unique indexes are the real duplicate check, so a conflict here is
+      // reported as one rather than as a generic failure.
+      return {
+        ok: false,
+        error: error.code === '23505'
+          ? 'That token is already listed on this chain.'
+          : 'Could not save. You may need to sign in as the admin.',
+      };
+    }
+    return { ok: true };
+  },
+
+  async update(id: string, patch: Partial<Listing>) {
+    if (!supabase) return useListingStore.getState().update(id, patch);
+    await supabase.from('listings').update(toRow(patch)).eq('id', id);
+  },
+
+  async remove(id: string) {
+    if (!supabase) return useListingStore.getState().remove(id);
+    await supabase.from('listings').delete().eq('id', id);
+  },
+
+  async move(id: string, direction: -1 | 1) {
+    if (!supabase) return useListingStore.getState().move(id, direction);
+
+    const ordered = [...useListingStore.getState().tokens].sort(
+      (a, b) => a.order - b.order,
+    );
+    const index = ordered.findIndex((t) => t.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ordered.length) return;
+
+    // Swap the two positions in one round trip.
+    await Promise.all([
+      supabase.from('listings').update({ position: target }).eq('id', ordered[index].id),
+      supabase.from('listings').update({ position: index }).eq('id', ordered[target].id),
+    ]);
+  },
+};

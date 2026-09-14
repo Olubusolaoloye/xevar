@@ -15,6 +15,7 @@ import { CHAINS } from '@/data/chains';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketStore } from '@/store/useMarketStore';
 import {
+  listingBackend,
   CATEGORY_LABEL,
   isPinned,
   useListingStore,
@@ -78,7 +79,7 @@ function Field({
  * pool, and an editable price field would be a fabrication tool.
  */
 function EditRow({ token, onDone }: { token: Listing; onDone: () => void }) {
-  const update = useListingStore((s) => s.update);
+  const update = listingBackend.update;
 
   const [draft, setDraft] = useState({
     label: token.label ?? '',
@@ -278,8 +279,8 @@ function EditRow({ token, onDone }: { token: Listing; onDone: () => void }) {
  */
 export function ListingList() {
   const tokens = useListingStore((s) => s.tokens);
-  const remove = useListingStore((s) => s.remove);
-  const move = useListingStore((s) => s.move);
+  const remove = listingBackend.remove;
+  const move = listingBackend.move;
   const pairs = useMarketStore((s) => s.pairs);
   const { compact: money } = useCurrency();
 

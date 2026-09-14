@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useMarketFeed } from '@/hooks/useMarketFeed';
 import { useThemeEffect } from '@/hooks/useTheme';
+import { startListingSync, stopListingSync } from '@/store/useListingStore';
+import { startAdminSync, stopAdminSync } from '@/store/useAdminStore';
 import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
@@ -15,6 +17,18 @@ export function AppShell() {
   // One feed for the whole application, mounted at the shell.
   useMarketFeed();
   useThemeEffect();
+
+  // Listings, adverts and settings come from the backend and stay in sync over
+  // a websocket, so an admin edit on one device reaches every open browser
+  // without anyone reloading.
+  useEffect(() => {
+    startListingSync();
+    startAdminSync();
+    return () => {
+      stopListingSync();
+      stopAdminSync();
+    };
+  }, []);
 
   // ⌘K / Ctrl-K from anywhere, and `/` when not already typing.
   useEffect(() => {

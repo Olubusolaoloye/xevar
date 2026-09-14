@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Gauge, Link2 } from 'lucide-react';
-import { buildVerdictUrl, useAdminStore } from '@/store/useAdminStore';
+import { adminBackend, buildVerdictUrl, useAdminStore } from '@/store/useAdminStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Toggle } from '@/components/ui/Toggle';
@@ -17,9 +17,9 @@ const POLL_OPTIONS = [10, 15, 30, 60];
  */
 export function AdminSettings() {
   const provider = useAdminStore((s) => s.provider);
-  const setProvider = useAdminStore((s) => s.setProvider);
+  const setProvider = adminBackend.setProvider;
   const pollSeconds = useAdminStore((s) => s.pollSeconds);
-  const setPollSeconds = useAdminStore((s) => s.setPollSeconds);
+  const setPollSeconds = adminBackend.setPollSeconds;
   const setPassHash = useAdminStore((s) => s.setPassHash);
 
   const [resetAsked, setResetAsked] = useState(false);

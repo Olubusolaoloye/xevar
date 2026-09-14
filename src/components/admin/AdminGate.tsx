@@ -1,160 +1,164 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { KeyRound, Lock, ShieldAlert } from 'lucide-react';
-import { sha256 } from '@/lib/hash';
-import { useAdminStore } from '@/store/useAdminStore';
+import { LogOut, Mail, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { hasBackend } from '@/lib/supabase';
+import { useAuthStore } from '@/store/useAuthStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Panel } from '@/components/ui/Panel';
 
-/** Unlock lasts for the tab session, so a reload does not re-prompt. */
-const SESSION_KEY = 'panscreener.admin.unlocked';
-
 /**
- * Passphrase gate for the admin screen.
+ * Admin sign-in.
  *
- * On first visit it asks for a passphrase to set. After that it asks for the
- * same passphrase to unlock, comparing hashes rather than plaintext.
+ * A magic link rather than a password: there is no secret to store, transmit,
+ * reuse or leak, and a link that expires is a smaller target than a password
+ * that does not.
  *
- * This keeps the admin controls out of the way of anyone casually browsing the
- * app. It is deliberately described in the UI as exactly that and not as
- * security: everything here runs in the visitor's own browser, so the check can
- * be bypassed by anyone who wants to. The app is read-only — the worst case is
- * someone editing their own copy of the token list — but the honest framing
- * matters, and the note below says so rather than implying protection the code
- * cannot provide.
+ * The important part is what is NOT here. This component decides what to
+ * render; it does not decide who may write. That is enforced by row-level
+ * security in Postgres, so a modified bundle that skipped this screen entirely
+ * would still have every write rejected by the database.
  */
 export function AdminGate({ children }: { children: ReactNode }) {
-  const passHash = useAdminStore((s) => s.passHash);
-  const setPassHash = useAdminStore((s) => s.setPassHash);
+  const { email, isAdmin, ready, init, signIn, signOut } = useAuthStore();
 
-  const [unlocked, setUnlocked] = useState(false);
   const [value, setValue] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  const isSetup = passHash === null;
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      if (sessionStorage.getItem(SESSION_KEY) === '1') setUnlocked(true);
-    } catch {
-      // Private browsing can throw on sessionStorage; just stay locked.
-    }
-  }, []);
+    init();
+  }, [init]);
+
+  // Without a backend there is nothing global to protect: settings are local to
+  // this browser, so a gate would be theatre.
+  if (!hasBackend) {
+    return (
+      <>
+        <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
+          <p className="flex items-start gap-2 rounded-md border border-warn/25 bg-warn/10 px-3.5 py-3 text-[11px] leading-relaxed text-warn">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            No backend is configured, so these settings are stored in this
+            browser only and are not shared with anyone else. Set
+            VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to make them global.
+          </p>
+        </div>
+        {children}
+      </>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-20 text-center">
+        <p className="text-sm text-ink-low">Checking your session…</p>
+      </div>
+    );
+  }
+
+  if (isAdmin) {
+    return (
+      <>
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 pt-6 sm:px-6">
+          <p className="flex items-center gap-2 text-[11px] text-ink-low">
+            <ShieldCheck className="h-3.5 w-3.5 text-up" />
+            Signed in as <span className="font-mono text-ink-mid">{email}</span>
+          </p>
+          <Button size="sm" variant="ghost" onClick={() => void signOut()}>
+            <LogOut className="h-3 w-3" />
+            Sign out
+          </Button>
+        </div>
+        {children}
+      </>
+    );
+  }
 
   const submit = async () => {
+    setBusy(true);
     setError(null);
+    const result = await signIn(value);
+    setBusy(false);
 
-    if (isSetup) {
-      if (value.length < 6) {
-        setError('Use at least 6 characters.');
-        return;
-      }
-      if (value !== confirm) {
-        setError('The two entries do not match.');
-        return;
-      }
-      setBusy(true);
-      setPassHash(await sha256(value));
-      setBusy(false);
-    } else {
-      setBusy(true);
-      const matches = (await sha256(value)) === passHash;
-      setBusy(false);
-      if (!matches) {
-        setError('That passphrase is not right.');
-        setValue('');
-        return;
-      }
+    if (!result.ok) {
+      setError(result.error ?? 'Could not send the link.');
+      return;
     }
-
-    try {
-      sessionStorage.setItem(SESSION_KEY, '1');
-    } catch {
-      // Not fatal — the unlock simply will not survive a reload.
-    }
-    setUnlocked(true);
+    setSent(true);
   };
-
-  if (unlocked) return <>{children}</>;
 
   return (
     <div className="mx-auto flex max-w-md flex-col justify-center px-4 py-20">
       <Panel elevation="lifted" className="overflow-hidden">
         <div className="border-b border-line px-5 py-4">
-          <p className="flex items-center gap-2 font-display text-sm font-semibold text-ink">
-            <Lock className="h-4 w-4 text-brand-500" />
-            {isSetup ? 'Set an admin passphrase' : 'Admin'}
-          </p>
+          <p className="font-display text-sm font-semibold text-ink">Admin</p>
           <p className="mt-1 text-xs leading-relaxed text-ink-low">
-            {isSetup
-              ? 'Choose a passphrase for this browser. It is stored as a hash, never as text.'
-              : 'Enter the passphrase to manage tokens, adverts and feed settings.'}
+            {email
+              ? 'That account is signed in but is not the admin.'
+              : 'Sign in to manage listings, adverts and settings.'}
           </p>
         </div>
 
         <div className="space-y-3 p-5">
-          <div>
-            <label htmlFor="admin-pass" className="mb-1.5 block text-xs font-medium text-ink-mid">
-              Passphrase
-            </label>
-            <Input
-              id="admin-pass"
-              type="password"
-              value={value}
-              autoFocus
-              autoComplete={isSetup ? 'new-password' : 'current-password'}
-              onChange={(e) => {
-                setValue(e.target.value);
-                setError(null);
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && !isSetup && void submit()}
-              icon={<KeyRound className="h-3.5 w-3.5" />}
-            />
-          </div>
-
-          {isSetup && (
-            <div>
-              <label htmlFor="admin-confirm" className="mb-1.5 block text-xs font-medium text-ink-mid">
-                Confirm
-              </label>
-              <Input
-                id="admin-confirm"
-                type="password"
-                value={confirm}
-                autoComplete="new-password"
-                onChange={(e) => {
-                  setConfirm(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && void submit()}
-              />
+          {sent ? (
+            <div className="rounded-md border border-up/25 bg-up/8 px-3.5 py-3">
+              <p className="text-sm font-medium text-up">Check your inbox</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-mid">
+                If that address is the admin, a sign-in link is on its way. Open
+                it on any device and you will be signed in there.
+              </p>
             </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="admin-email" className="mb-1.5 block text-xs font-medium text-ink-mid">
+                  Admin email
+                </label>
+                <Input
+                  id="admin-email"
+                  type="email"
+                  autoComplete="email"
+                  value={value}
+                  autoFocus
+                  onChange={(e) => {
+                    setValue(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && void submit()}
+                  icon={<Mail className="h-3.5 w-3.5" />}
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              {error && (
+                <p className="rounded-sm border border-down/25 bg-down/10 px-3 py-2 text-xs text-down">
+                  {error}
+                </p>
+              )}
+
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                disabled={busy || value.trim().length < 3}
+                onClick={() => void submit()}
+              >
+                {busy ? 'Sending…' : 'Email me a sign-in link'}
+              </Button>
+            </>
           )}
 
-          {error && (
-            <p className="rounded-sm border border-down/25 bg-down/10 px-3 py-2 text-xs text-down">
-              {error}
-            </p>
+          {email && !isAdmin && (
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => void signOut()}>
+              Sign out of {email}
+            </Button>
           )}
-
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            disabled={busy || value.length === 0}
-            onClick={() => void submit()}
-          >
-            {isSetup ? 'Set passphrase' : 'Unlock'}
-          </Button>
 
           <p className="flex items-start gap-2 border-t border-line pt-3 text-[11px] leading-relaxed text-ink-dim">
-            <ShieldAlert className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
-            This keeps the admin controls out of the way — it is not security.
-            Everything runs in your browser, so the check can be bypassed by
-            anyone determined. Nothing here can move funds; the app is read-only.
-            Real access control needs these settings to live behind a server.
+            <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-up" />
+            One address is allowed to write, and that rule lives in the database.
+            Editing the app in your browser cannot get around it — every write is
+            checked server-side before it is accepted.
           </p>
         </div>
       </Panel>

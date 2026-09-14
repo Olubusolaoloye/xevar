@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { hasBackend, supabase, type AdSlideRow, type AppSettingsRow } from '@/lib/supabase';
 
 /**
  * A slide in the hero carousel.
@@ -151,3 +152,157 @@ export const useAdminStore = create<AdminState>()(
     { name: 'panscreener.admin' },
   ),
 );
+
+
+/* -------------------------------------------------------------------------- */
+/* Backend sync                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Slides and settings live in Postgres when a backend is configured, so an
+ * edit on one device shows up on every other one. Without a backend the
+ * persisted local store above stays in charge.
+ */
+
+function slideFromRow(row: AdSlideRow): AdSlide {
+  return {
+    id: row.id,
+    eyebrow: row.eyebrow ?? undefined,
+    title: row.title,
+    body: row.body ?? undefined,
+    ctaLabel: row.cta_label ?? undefined,
+    ctaHref: row.cta_href ?? undefined,
+    imageUrl: row.image_url ?? undefined,
+    sponsored: row.sponsored,
+    enabled: row.enabled,
+    order: row.position,
+  };
+}
+
+function slideToRow(slide: Partial<AdSlide>) {
+  const row: Record<string, unknown> = {};
+  const put = (key: string, value: unknown) => {
+    if (value !== undefined) row[key] = value === '' ? null : value;
+  };
+  put('eyebrow', slide.eyebrow ?? null);
+  put('title', slide.title);
+  put('body', slide.body ?? null);
+  put('cta_label', slide.ctaLabel ?? null);
+  put('cta_href', slide.ctaHref ?? null);
+  put('image_url', slide.imageUrl ?? null);
+  put('sponsored', slide.sponsored);
+  put('enabled', slide.enabled);
+  put('position', slide.order);
+  return row;
+}
+
+let slideChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+let settingsChannel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+
+export function startAdminSync() {
+  if (!supabase || slideChannel) return;
+
+  const loadSlides = async () => {
+    const { data, error } = await supabase!
+      .from('ad_slides')
+      .select('*')
+      .order('position', { ascending: true });
+    if (error || !data) return;
+    useAdminStore.setState({ slides: (data as AdSlideRow[]).map(slideFromRow) });
+  };
+
+  const loadSettings = async () => {
+    const { data, error } = await supabase!
+      .from('app_settings')
+      .select('*')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error || !data) return;
+
+    const row = data as AppSettingsRow;
+    useAdminStore.setState({
+      pollSeconds: row.poll_seconds,
+      provider: {
+        name: row.verdict_name,
+        urlTemplate: row.verdict_url_template,
+        enabled: row.verdict_enabled,
+      },
+    });
+  };
+
+  void loadSlides();
+  void loadSettings();
+
+  slideChannel = supabase
+    .channel('slides-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ad_slides' },
+        () => void loadSlides())
+    .subscribe();
+
+  settingsChannel = supabase
+    .channel('settings-sync')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' },
+        () => void loadSettings())
+    .subscribe();
+}
+
+export function stopAdminSync() {
+  if (!supabase) return;
+  if (slideChannel) {
+    void supabase.removeChannel(slideChannel);
+    slideChannel = null;
+  }
+  if (settingsChannel) {
+    void supabase.removeChannel(settingsChannel);
+    settingsChannel = null;
+  }
+}
+
+export const adminBackend = {
+  enabled: hasBackend,
+
+  async addSlide(slide: Omit<AdSlide, 'id' | 'order'>) {
+    if (!supabase) return useAdminStore.getState().addSlide(slide);
+    const count = useAdminStore.getState().slides.length;
+    await supabase.from('ad_slides').insert({ ...slideToRow(slide), position: count });
+  },
+
+  async updateSlide(id: string, patch: Partial<AdSlide>) {
+    if (!supabase) return useAdminStore.getState().updateSlide(id, patch);
+    await supabase.from('ad_slides').update(slideToRow(patch)).eq('id', id);
+  },
+
+  async removeSlide(id: string) {
+    if (!supabase) return useAdminStore.getState().removeSlide(id);
+    await supabase.from('ad_slides').delete().eq('id', id);
+  },
+
+  async moveSlide(id: string, direction: -1 | 1) {
+    if (!supabase) return useAdminStore.getState().moveSlide(id, direction);
+
+    const ordered = [...useAdminStore.getState().slides].sort((a, b) => a.order - b.order);
+    const index = ordered.findIndex((s) => s.id === id);
+    const target = index + direction;
+    if (index < 0 || target < 0 || target >= ordered.length) return;
+
+    await Promise.all([
+      supabase.from('ad_slides').update({ position: target }).eq('id', ordered[index].id),
+      supabase.from('ad_slides').update({ position: index }).eq('id', ordered[target].id),
+    ]);
+  },
+
+  async setProvider(patch: Partial<VerdictProvider>) {
+    if (!supabase) return useAdminStore.getState().setProvider(patch);
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.verdict_name = patch.name;
+    if (patch.urlTemplate !== undefined) row.verdict_url_template = patch.urlTemplate;
+    if (patch.enabled !== undefined) row.verdict_enabled = patch.enabled;
+    await supabase.from('app_settings').update(row).eq('id', 1);
+  },
+
+  async setPollSeconds(seconds: number) {
+    const clamped = Math.min(120, Math.max(10, Math.round(seconds)));
+    if (!supabase) return useAdminStore.getState().setPollSeconds(clamped);
+    await supabase.from('app_settings').update({ poll_seconds: clamped }).eq('id', 1);
+  },
+};

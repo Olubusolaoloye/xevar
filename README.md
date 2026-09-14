@@ -96,6 +96,40 @@ Or point either host's dashboard at this repo; the committed config is picked
 up automatically and every push to `main` redeploys. Both serve from the domain
 root, so no `VITE_BASE` is needed.
 
+## Backend (optional)
+
+Without a backend PanScreener runs entirely in the browser and admin settings
+stay local to one device. Point it at Supabase and listings, adverts and
+settings become global: one admin edits them, everyone sees the change, live.
+
+**Setup, once:**
+
+1. Create a Supabase project (free).
+2. Open the SQL editor and run `supabase/001_panscreener.sql`. It creates the
+   tables, the row-level-security policies, and seeds the starting listings.
+3. Authentication → Providers → enable **Email**, and turn *Confirm email* on.
+   Under URL Configuration add your site URL to the redirect allowlist.
+4. Authentication → Users → invite the admin address. The SQL allowlists
+   `devolufinodiv@gmail.com`; change the `admin_allowlist` row to move it.
+5. Project Settings → API: copy the URL and the publishable (anon) key into
+   `.env` locally, and into the repository's Actions **variables** for deploys.
+
+Both values are public by design. The anon key grants only what the policies
+allow, and those live in Postgres — a modified bundle cannot write past them.
+The `service_role` key is a real secret and must never reach the client.
+
+**What is global vs local**
+
+| Global (admin-controlled) | Local to each visitor |
+| --- | --- |
+| Listings and their presentation | Watchlist |
+| Carousel adverts | Recorded positions and P&L |
+| Refresh rate, verdict provider | Tracked wallets, alerts |
+| | Theme, currency, density |
+
+Personal data stays in the browser deliberately — nobody's watchlist belongs
+in a shared database.
+
 ## Architecture
 
 ```
