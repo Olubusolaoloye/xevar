@@ -21,6 +21,7 @@
  * good numbers on screen instead of emptying the board.
  */
 
+import { extendSparkline } from '@/data/sparkline';
 import { cached } from './cache';
 import { fetchTokenPairs, fetchTokensByAddress, searchPairs } from './sources/dexscreener';
 import { useAdminStore } from '@/store/useAdminStore';
@@ -131,6 +132,7 @@ export class MarketFeed {
         { freshMs: immediate ? 0 : FRESH_MS, maxStaleMs: MAX_STALE_MS },
       );
 
+      this.pruneHistory(value);
       this.pairs = value.map((pair) => this.withSparkline(pair));
       this.everLoaded = true;
       this.onPairs(this.pairs);
@@ -278,22 +280,34 @@ export class MarketFeed {
    * Attach a sparkline.
    *
    * DexScreener returns no price history, and fetching candles per row would
-   * blow through GeckoTerminal's 30/min limit instantly. So the line starts as
-   * a two-point interpolation between the price implied by the 24h change and
-   * the current price — honest about direction and magnitude, if not shape —
-   * and fills in with genuinely observed prices as the feed polls.
+   * blow through GeckoTerminal's 30/min limit instantly. So the series is the
+   * price implied by the 24h change, followed by every price this session has
+   * actually observed — honest about direction and magnitude, if not shape.
+   *
+   * The construction rules, and the bugs behind them, live in ./sparkline.
    */
   private withSparkline(pair: Pair): Pair {
-    const observed = this.history.get(pair.id) ?? [];
-    observed.push(pair.priceUsd);
-    // Cap the rolling window so a long session cannot grow this without bound.
-    if (observed.length > 48) observed.shift();
+    const { observed, sparkline } = extendSparkline(
+      this.history.get(pair.id) ?? [],
+      pair.priceUsd,
+      pair.change.h24,
+    );
     this.history.set(pair.id, observed);
+    return { ...pair, sparkline };
+  }
 
-    if (observed.length >= 3) return { ...pair, sparkline: observed };
-
-    const opening = pair.priceUsd / (1 + pair.change.h24 / 100);
-    return { ...pair, sparkline: [opening, ...observed] };
+  /**
+   * Forget history for pairs no longer on the board.
+   *
+   * Without this the map grows for the life of the session every time a
+   * listing is removed or renamed, holding price arrays nothing will read.
+   */
+  private pruneHistory(pairs: Pair[]) {
+    if (this.history.size <= pairs.length) return;
+    const live = new Set(pairs.map((p) => p.id));
+    for (const id of this.history.keys()) {
+      if (!live.has(id)) this.history.delete(id);
+    }
   }
 
 }
