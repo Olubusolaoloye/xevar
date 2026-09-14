@@ -2,7 +2,7 @@
  * The domain model for PanScreener.
  *
  * These types are the contract between the UI and whatever is supplying market
- * data. A live on-chain API, the Binance websocket, and the seeded mock source
+ * data. Any market source — DexScreener today, another provider tomorrow —
  * all produce exactly these shapes, which is what makes the data source
  * swappable without touching a single component.
  */
@@ -156,36 +156,6 @@ export interface Candle {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Portfolio                                                                  */
-/* -------------------------------------------------------------------------- */
-
-export interface Wallet {
-  id: string;
-  address: string;
-  label: string;
-  chains: ChainId[];
-  addedAt: number;
-}
-
-export interface Holding {
-  id: string;
-  walletId: string;
-  chain: ChainId;
-  token: TokenRef;
-  balance: number;
-  priceUsd: number;
-  valueUsd: number;
-  change24h: number;
-  /** Average cost basis per token, when known. */
-  costBasis?: number;
-}
-
-export interface PortfolioPoint {
-  time: number;
-  valueUsd: number;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Alerts                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -259,5 +229,4 @@ export type FeedStatus =
   | 'connecting'
   | 'live'
   | 'stale'
-  | 'seeded'
   | 'offline';

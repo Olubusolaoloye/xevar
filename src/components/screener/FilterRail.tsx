@@ -1,9 +1,11 @@
+import { useMemo } from 'react';
 import { RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatCompact } from '@/lib/format';
-import { CHAIN_LIST, ALL_DEXES, CHAINS } from '@/data/chains';
+import { CHAIN_LIST, CHAINS } from '@/data/chains';
 import { activeFilterCount } from '@/data/query';
 import { useScreenerStore } from '@/store/useScreenerStore';
+import { useMarketStore } from '@/store/useMarketStore';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import type { ScreenerFilters, ScreenerQuery } from '@/data/types';
@@ -69,6 +71,19 @@ export function FilterRail({ query, className }: { query: ScreenerQuery; classNa
   const toggleDex = useScreenerStore((s) => s.toggleDex);
   const setFilter = useScreenerStore((s) => s.setFilter);
   const resetFilters = useScreenerStore((s) => s.resetFilters);
+  const pairs = useMarketStore((s) => s.pairs);
+
+  /**
+   * The exchanges actually present on the board.
+   *
+   * Derived rather than hardcoded: a fixed list offers filters for venues that
+   * may return nothing, and goes stale the moment a new DEX matters. An empty
+   * board simply shows no exchange filter, which is the truthful answer.
+   */
+  const dexes = useMemo(
+    () => Array.from(new Set(pairs.map((p) => p.dex))).sort(),
+    [pairs],
+  );
 
   const count = activeFilterCount(query);
 
@@ -174,19 +189,21 @@ export function FilterRail({ query, className }: { query: ScreenerQuery; classNa
         </div>
       </Section>
 
-      <Section title="Exchanges">
-        <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
-          {ALL_DEXES.map((dex) => (
-            <Chip
-              key={dex}
-              active={query.dexes.includes(dex)}
-              onClick={() => toggleDex(dex)}
-            >
-              {dex}
-            </Chip>
-          ))}
-        </div>
-      </Section>
+      {dexes.length > 0 && (
+        <Section title="Exchanges">
+          <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
+            {dexes.map((dex) => (
+              <Chip
+                key={dex}
+                active={query.dexes.includes(dex)}
+                onClick={() => toggleDex(dex)}
+              >
+                {dex}
+              </Chip>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <div className="px-4 py-3">
         <p className="text-[11px] leading-relaxed text-ink-dim">

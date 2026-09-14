@@ -27,11 +27,6 @@ const STATUS_COPY: Record<FeedStatus, { label: string; detail: string; tone: str
       'The last refresh failed. These are the most recent values received, not live ones.',
     tone: 'text-warn',
   },
-  seeded: {
-    label: 'Demo data',
-    detail: 'Generated sample data — not real prices.',
-    tone: 'text-accent-500',
-  },
   offline: {
     label: 'Unavailable',
     detail:

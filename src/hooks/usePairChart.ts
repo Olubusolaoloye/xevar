@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react';
 import { cached } from '@/data/cache';
 import { fetchCandles, fetchTrades, type CandleInterval } from '@/data/sources/geckoterminal';
-import { generateCandles, generateTrades } from '@/data/sources/mock';
 import type { Candle, Pair, Trade } from '@/data/types';
 
 interface AsyncResult<T> {
   data: T;
   loading: boolean;
-  /** True when the data is generated because the provider was unreachable. */
-  simulated: boolean;
+  /**
+   * True when the provider could not be reached.
+   *
+   * The data is empty in that case. It used to be filled with a generated
+   * series instead, which drew a plausible-looking chart of a market that
+   * never happened — the one thing this app must never do. An empty chart
+   * that says why is the honest answer.
+   */
+  failed: boolean;
 }
 
 /**
@@ -22,7 +28,7 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
   const [state, setState] = useState<AsyncResult<Candle[]>>({
     data: [],
     loading: true,
-    simulated: false,
+    failed: false,
   });
 
   useEffect(() => {
@@ -39,11 +45,11 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
         if (cancelled) return;
         // An empty response means the pool has no history on this provider;
         // that is a real answer, not a failure.
-        setState({ data: value, loading: false, simulated: false });
+        setState({ data: value, loading: false, failed: false });
       })
       .catch(() => {
         if (cancelled) return;
-        setState({ data: generateCandles(pair), loading: false, simulated: true });
+        setState({ data: [], loading: false, failed: true });
       });
 
     return () => {
@@ -59,7 +65,7 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
   const [state, setState] = useState<AsyncResult<Trade[]>>({
     data: [],
     loading: true,
-    simulated: false,
+    failed: false,
   });
 
   useEffect(() => {
@@ -73,12 +79,10 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
         { freshMs: refreshMs - 2_000, maxStaleMs: 5 * 60_000 },
       )
         .then(({ value }) => {
-          if (!cancelled) setState({ data: value, loading: false, simulated: false });
+          if (!cancelled) setState({ data: value, loading: false, failed: false });
         })
         .catch(() => {
-          if (!cancelled) {
-            setState({ data: generateTrades(pair, 40), loading: false, simulated: true });
-          }
+          if (!cancelled) setState({ data: [], loading: false, failed: true });
         });
     };
 
