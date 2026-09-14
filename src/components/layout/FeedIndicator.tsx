@@ -5,26 +5,34 @@ import type { FeedStatus } from '@/data/types';
 
 const COPY: Record<FeedStatus, { label: string; detail: string; dot: string; text: string }> = {
   connecting: {
-    label: 'Connecting',
-    detail: 'Opening the live market stream…',
+    label: 'Loading',
+    detail: 'Fetching live pairs from DexScreener…',
     dot: 'bg-warn',
     text: 'text-warn',
   },
   live: {
     label: 'Live',
-    detail: 'Streaming real-time prices. Long-tail pairs are simulated.',
+    detail: 'Real market data, refreshed every 30 seconds. Majors also stream tick-by-tick.',
     dot: 'bg-brand-500 pulse-ring',
     text: 'text-brand-500',
   },
-  reconnecting: {
-    label: 'Reconnecting',
-    detail: 'The stream dropped. Retrying with backoff.',
+  stale: {
+    label: 'Cached',
+    detail:
+      'The last refresh failed, so these are the most recent values received rather than live ones. Retrying automatically.',
     dot: 'bg-warn',
     text: 'text-warn',
   },
+  seeded: {
+    label: 'Demo data',
+    detail:
+      'The market API could not be reached, so this is generated sample data — not real prices. Check your connection.',
+    dot: 'bg-accent-500',
+    text: 'text-accent-500',
+  },
   offline: {
     label: 'Offline',
-    detail: 'No live stream available. Showing the last known board.',
+    detail: 'No market data available. Showing the last known board.',
     dot: 'bg-ink-dim',
     text: 'text-ink-low',
   },

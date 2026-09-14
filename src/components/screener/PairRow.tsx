@@ -53,6 +53,7 @@ function PairRowBase({ pair, rank, timeframe, compact }: PairRowProps) {
           <TokenAvatar
             symbol={pair.baseToken.symbol}
             chain={pair.chain}
+            src={pair.imageUrl}
             size={compact ? 'sm' : 'md'}
           />
           <span className="min-w-0">
@@ -118,7 +119,7 @@ function PairRowBase({ pair, rank, timeframe, compact }: PairRowProps) {
       {/* Makers */}
       <td className={cn(cellPad, 'text-right', HIDE_CLASS['2xl'])}>
         <span className="tnum font-mono text-xs text-ink-mid">
-          {formatCompact(pair.makers24h)}
+          {pair.makers24h < 0 ? '—' : formatCompact(pair.makers24h)}
         </span>
       </td>
 

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatClock, formatQuantity, truncateAddress } from '@/lib/format';
 import { PriceText } from '@/components/ui/PriceText';
 import { useCurrency } from '@/hooks/useCurrency';
-import { generateTrades } from '@/data/sources/mock';
+import { usePairTrades } from '@/hooks/usePairChart';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { CHAINS } from '@/data/chains';
 import type { Pair, Trade } from '@/data/types';
 
@@ -16,49 +18,53 @@ import type { Pair, Trade } from '@/data/types';
  */
 export function TradeTape({ pair }: { pair: Pair }) {
   const { compact: money } = useCurrency();
-  const initial = useMemo(() => generateTrades(pair, 40), [pair]);
-  const [trades, setTrades] = useState<Trade[]>(initial);
-  const [freshId, setFreshId] = useState<string | null>(null);
+  const { data: trades, loading } = usePairTrades(pair);
 
-  // Reset the tape when navigating between pairs.
+  // Highlight fills that are new since the previous poll, so the eye catches
+  // what actually just happened rather than re-flashing the whole tape.
+  const knownIds = useRef<Set<string>>(new Set());
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
-    setTrades(initial);
-    setFreshId(null);
-  }, [initial]);
+    if (trades.length === 0) return;
 
-  // Synthesise new fills on an irregular cadence — a perfectly regular tape
-  // reads as fake immediately.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
+    const incoming = new Set(trades.map((trade) => trade.id));
+    // The first load is not "new" — everything would flash at once.
+    if (knownIds.current.size === 0) {
+      knownIds.current = incoming;
+      return;
+    }
 
-    const schedule = () => {
-      timer = setTimeout(() => {
-        const buyBias = 0.5 + Math.tanh(pair.change.h1 / 40) * 0.18;
-        const side: Trade['side'] = Math.random() < buyBias ? 'buy' : 'sell';
-        const valueUsd =
-          (pair.volume.h1 / Math.max(1, pair.txns.h1.buys + pair.txns.h1.sells)) *
-          (0.2 + Math.random() * 6);
-        const priceUsd = pair.priceUsd * (1 + (Math.random() - 0.5) * 0.006);
+    const fresh = new Set<string>();
+    for (const id of incoming) {
+      if (!knownIds.current.has(id)) fresh.add(id);
+    }
+    knownIds.current = incoming;
+    if (fresh.size === 0) return;
 
-        const trade: Trade = {
-          id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          timestamp: Date.now(),
-          side,
-          priceUsd,
-          amount: valueUsd / priceUsd,
-          valueUsd,
-          maker: `0x${Math.random().toString(16).slice(2, 10)}${'0'.repeat(32)}`,
-        };
-
-        setTrades((current) => [trade, ...current].slice(0, 60));
-        setFreshId(trade.id);
-        schedule();
-      }, 1200 + Math.random() * 3800);
-    };
-
-    schedule();
+    setFreshIds(fresh);
+    const timer = setTimeout(() => setFreshIds(new Set()), 1200);
     return () => clearTimeout(timer);
-  }, [pair]);
+  }, [trades]);
+
+  if (loading && trades.length === 0) {
+    return (
+      <div className="space-y-1.5 p-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={i} className="h-6 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (trades.length === 0) {
+    return (
+      <EmptyState
+        title="No recent trades"
+        description="This pool has not printed a fill recently, or the trade feed does not cover it."
+      />
+    );
+  }
 
   const explorer = CHAINS[pair.chain].explorer;
 
@@ -92,7 +98,7 @@ export function TradeTape({ pair }: { pair: Pair }) {
                 key={trade.id}
                 className={cn(
                   'border-b border-line-soft text-xs transition-colors',
-                  trade.id === freshId && (buy ? 'tick-up' : 'tick-down'),
+                  freshIds.has(trade.id) && (buy ? 'tick-up' : 'tick-down'),
                 )}
               >
                 <td className="tnum whitespace-nowrap px-3 py-1.5 font-mono text-ink-low">
@@ -119,14 +125,18 @@ export function TradeTape({ pair }: { pair: Pair }) {
                   {money(trade.valueUsd)}
                 </td>
                 <td className="hidden px-3 py-1.5 text-right md:table-cell">
-                  <a
-                    href={`${explorer}/address/${trade.maker}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-ink-low transition-colors hover:text-brand-500"
-                  >
-                    {truncateAddress(trade.maker, 6, 4)}
-                  </a>
+                  {trade.maker ? (
+                    <a
+                      href={`${explorer}/address/${trade.maker}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-ink-low transition-colors hover:text-brand-500"
+                    >
+                      {truncateAddress(trade.maker, 6, 4)}
+                    </a>
+                  ) : (
+                    <span className="text-ink-dim">—</span>
+                  )}
                 </td>
               </tr>
             );

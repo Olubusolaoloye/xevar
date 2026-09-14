@@ -1,0 +1,107 @@
+/**
+ * Stale-while-revalidate cache for market requests.
+ *
+ * A screener polls the same endpoints continuously, and public APIs rate-limit.
+ * This keeps the last good response for every key and serves it while a refresh
+ * is in flight, so a slow request, a 429, or a few seconds of lost connectivity
+ * never empties the board — the UI keeps the previous numbers and reports that
+ * they are stale rather than blanking or, worse, presenting stale data as live.
+ */
+
+interface Entry<T> {
+  value: T;
+  /** When the value was written. */
+  storedAt: number;
+  /** In-flight refresh, so concurrent callers share one request. */
+  inflight?: Promise<T>;
+}
+
+export interface CacheOptions {
+  /** Below this age the cached value is returned without any network call. */
+  freshMs?: number;
+  /**
+   * Above this age the value is considered unusable and a failed refresh
+   * surfaces as an error instead of returning it.
+   */
+  maxStaleMs?: number;
+}
+
+const DEFAULTS: Required<CacheOptions> = {
+  freshMs: 15_000,
+  maxStaleMs: 5 * 60_000,
+};
+
+export interface CacheResult<T> {
+  value: T;
+  /** True when the value came from cache because the network failed. */
+  stale: boolean;
+  /** Age of the returned value in milliseconds. */
+  ageMs: number;
+}
+
+const store = new Map<string, Entry<unknown>>();
+
+/**
+ * Fetch through the cache.
+ *
+ * - Fresh value → returned immediately, no request.
+ * - Stale value → a refresh is attempted; if it fails, the stale value is
+ *   returned with `stale: true` rather than throwing.
+ * - No value → the request must succeed, or the error propagates.
+ */
+export async function cached<T>(
+  key: string,
+  loader: () => Promise<T>,
+  options: CacheOptions = {},
+): Promise<CacheResult<T>> {
+  const { freshMs, maxStaleMs } = { ...DEFAULTS, ...options };
+  const entry = store.get(key) as Entry<T> | undefined;
+  const now = Date.now();
+
+  if (entry) {
+    const age = now - entry.storedAt;
+    if (age < freshMs) return { value: entry.value, stale: false, ageMs: age };
+  }
+
+  // Collapse concurrent refreshes of the same key into one request.
+  const existing = entry?.inflight;
+  const request =
+    existing ??
+    loader()
+      .then((value) => {
+        store.set(key, { value, storedAt: Date.now() });
+        return value;
+      })
+      .catch((error) => {
+        // Clear only the in-flight marker; the last good value must survive.
+        const current = store.get(key) as Entry<T> | undefined;
+        if (current) store.set(key, { value: current.value, storedAt: current.storedAt });
+        throw error;
+      });
+
+  if (entry && !existing) {
+    store.set(key, { ...entry, inflight: request });
+  }
+
+  try {
+    const value = await request;
+    return { value, stale: false, ageMs: 0 };
+  } catch (error) {
+    const fallback = store.get(key) as Entry<T> | undefined;
+    const age = fallback ? Date.now() - fallback.storedAt : Infinity;
+
+    if (fallback && age <= maxStaleMs) {
+      return { value: fallback.value, stale: true, ageMs: age };
+    }
+    throw error;
+  }
+}
+
+/** Read a cached value without triggering a request. */
+export function peek<T>(key: string): T | undefined {
+  return (store.get(key) as Entry<T> | undefined)?.value;
+}
+
+export function clearCache() {
+  store.clear();
+}

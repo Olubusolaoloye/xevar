@@ -11,7 +11,9 @@ import {
 import { formatAxisPrice, formatCompact } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { generateCandles } from '@/data/sources/mock';
+import { usePairCandles } from '@/hooks/usePairChart';
+import { Skeleton } from '@/components/ui/Skeleton';
+import type { CandleInterval } from '@/data/sources/geckoterminal';
 import type { Pair } from '@/data/types';
 
 type Range = '1h' | '6h' | '24h' | '7d' | 'all';
@@ -24,13 +26,17 @@ const RANGE_OPTIONS = [
   { value: 'all' as Range, label: 'ALL' },
 ];
 
-/** Bars to show per range — the generator emits one candle per 15 minutes. */
-const RANGE_BARS: Record<Range, number> = {
-  '1h': 4,
-  '6h': 24,
-  '24h': 96,
-  '7d': 160,
-  all: 160,
+/**
+ * Each range picks the candle interval that gives it a useful number of bars —
+ * five-minute candles over a day would be 288 slivers, daily candles over an
+ * hour would be one.
+ */
+const RANGE_SPEC: Record<Range, { interval: CandleInterval; bars: number }> = {
+  '1h': { interval: 'm5', bars: 12 },
+  '6h': { interval: 'm15', bars: 24 },
+  '24h': { interval: 'h1', bars: 24 },
+  '7d': { interval: 'h4', bars: 42 },
+  all: { interval: 'd1', bars: 180 },
 };
 
 function ChartTooltip({
@@ -78,10 +84,9 @@ export function PriceChart({ pair }: { pair: Pair }) {
   const [range, setRange] = useState<Range>('24h');
   const { priceText, convert, symbol } = useCurrency();
 
-  const data = useMemo(() => {
-    const candles = generateCandles(pair);
-    return candles.slice(-RANGE_BARS[range]);
-  }, [pair, range]);
+  const spec = RANGE_SPEC[range];
+  const { data: candles, loading, simulated } = usePairCandles(pair, spec.interval);
+  const data = useMemo(() => candles.slice(-spec.bars), [candles, spec.bars]);
 
   const rising = data.length > 1 && data[data.length - 1].close >= data[0].close;
   const color = rising ? 'var(--color-up)' : 'var(--color-down)';
@@ -89,8 +94,13 @@ export function PriceChart({ pair }: { pair: Pair }) {
   return (
     <div>
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-low">
+        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-ink-low">
           Price
+          {simulated && (
+            <span className="rounded-xs bg-accent-500/12 px-1 py-0.5 text-accent-500 normal-case tracking-normal">
+              sample history
+            </span>
+          )}
         </p>
         <SegmentedControl<Range>
           options={RANGE_OPTIONS}
@@ -101,6 +111,13 @@ export function PriceChart({ pair }: { pair: Pair }) {
       </div>
 
       <div className="h-[300px] p-2 sm:h-[380px]">
+        {loading && data.length === 0 ? (
+          <Skeleton className="h-full w-full" />
+        ) : data.length === 0 ? (
+          <div className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-low">
+            No price history for this pool yet.
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
             <defs>
@@ -153,6 +170,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
             />
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </div>
     </div>
   );

@@ -1,39 +1,51 @@
 /**
- * The live market feed.
+ * The market feed.
  *
- * Composes the two data sources into one coherent stream:
+ * Composes the real providers into one board:
  *
- *   1. Real Binance prices are applied to any pair whose base symbol is listed
- *      there — the majors on the board genuinely tick with the market.
- *   2. Everything else (the long tail, which has no centralised quote) is
- *      advanced by a bounded random walk, so the whole board feels alive rather
- *      than half-frozen.
+ *   1. DexScreener supplies the pairs — real price, liquidity, volume, txns
+ *      and market cap across every tracked chain. Free, keyless, ~300 req/min.
+ *   2. Binance's websocket overlays sub-second prices on the majors, so the
+ *      board keeps moving between polls instead of stepping once per interval.
+ *   3. The seeded generator is a last resort, used only when the API has never
+ *      answered — and the UI says so plainly rather than passing it off as real.
  *
- * Adding a real on-chain source later means implementing `MarketSource` and
- * registering it here; no component changes.
+ * Every request goes through the stale-while-revalidate cache, so a slow
+ * response, a rate limit, or a few seconds of lost connectivity keeps the last
+ * good numbers on screen instead of emptying the board.
  */
 
-import { createRng } from '@/lib/seed';
+import { cached } from './cache';
 import { BinanceTickerSource, type Ticker } from './sources/binance';
+import { fetchBoostedPairs, searchPairs } from './sources/dexscreener';
 import { generatePairs } from './sources/mock';
 import type { FeedStatus, Pair } from './types';
 
-/** How often the simulated walk advances the long tail. */
-const WALK_INTERVAL_MS = 1_500;
-/** Fraction of long-tail pairs that move on any given tick. */
-const WALK_SHARE = 0.22;
+/** How often the board is refreshed from DexScreener. */
+const POLL_INTERVAL_MS = 30_000;
+/** Values younger than this are served straight from cache. */
+const FRESH_MS = 20_000;
+/** Beyond this the cached board is too old to keep showing. */
+const MAX_STALE_MS = 10 * 60_000;
+
+/**
+ * DexScreener has no "list every pair" endpoint, so the board is assembled
+ * from the boosted/trending feed plus searches for the major quote assets —
+ * which is what surfaces the deepest, most-traded pools on each chain.
+ */
+const SEED_QUERIES = ['SOL', 'WETH', 'USDC', 'WBNB', 'cbBTC', 'ARB'];
 
 type PairsHandler = (pairs: Pair[]) => void;
-type StatusHandler = (status: FeedStatus) => void;
+type StatusHandler = (status: FeedStatus, detail?: { ageMs: number }) => void;
 
 export class MarketFeed {
-  private pairs: Pair[];
-  private walkTimer: ReturnType<typeof setInterval> | null = null;
+  private pairs: Pair[] = [];
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   private binance: BinanceTickerSource | null = null;
-  private rng = createRng('panscreener::walk');
   private started = false;
-  /** Base symbols currently quoted by the exchange; these are never walked. */
-  private liveSymbols = new Set<string>();
+  private everLoaded = false;
+  /** Rolling observed prices per pair id, used to build real sparklines. */
+  private history = new Map<string, number[]>();
 
   private onPairs: PairsHandler;
   private onStatus: StatusHandler;
@@ -41,10 +53,8 @@ export class MarketFeed {
   constructor(onPairs: PairsHandler, onStatus: StatusHandler) {
     this.onPairs = onPairs;
     this.onStatus = onStatus;
-    this.pairs = generatePairs();
   }
 
-  /** The current board. Safe to read before `start()`. */
   snapshot(): Pair[] {
     return this.pairs;
   }
@@ -53,97 +63,128 @@ export class MarketFeed {
     if (this.started) return;
     this.started = true;
 
+    this.onStatus('connecting');
+    void this.refresh();
+
+    this.pollTimer = setInterval(() => void this.refresh(), POLL_INTERVAL_MS);
+
+    // Majors only; everything else moves on the poll.
     this.binance = new BinanceTickerSource(
       (tickers) => this.applyTickers(tickers),
-      (status) => this.onStatus(status),
+      () => {
+        // The websocket is an enhancement, not the source of truth — its
+        // connection state must not override what the board actually knows.
+      },
     );
     this.binance.connect();
-
-    this.walkTimer = setInterval(() => this.walk(), WALK_INTERVAL_MS);
   }
 
   stop() {
     this.started = false;
-    if (this.walkTimer) {
-      clearInterval(this.walkTimer);
-      this.walkTimer = null;
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
     this.binance?.dispose();
     this.binance = null;
   }
 
-  /** Overlay real exchange prices onto the pairs that have them. */
-  private applyTickers(tickers: Map<string, Ticker>) {
-    // Remember which symbols the exchange is quoting, so the simulated walk
-    // below knows to leave those pairs alone.
-    this.liveSymbols = new Set(tickers.keys());
-    let changed = false;
+  /** Pull a fresh board, falling back through cache and then to seeded data. */
+  private async refresh() {
+    try {
+      const { value, stale, ageMs } = await cached(
+        'board',
+        () => this.loadBoard(),
+        { freshMs: FRESH_MS, maxStaleMs: MAX_STALE_MS },
+      );
 
-    this.pairs = this.pairs.map((pair) => {
-      const key = pair.baseToken.symbol.replace(/^W/, '');
-      const ticker = tickers.get(key);
-      if (!ticker || ticker.priceUsd === pair.priceUsd) return pair;
+      if (value.length === 0) {
+        this.fallBackToSeeded();
+        return;
+      }
 
-      changed = true;
-      return {
-        ...pair,
-        priceUsd: ticker.priceUsd,
-        change: { ...pair.change, h24: ticker.change24h },
-        // Keep the sparkline's final point honest against the new price.
-        sparkline: [...pair.sparkline.slice(1), ticker.priceUsd],
-      };
-    });
+      this.pairs = value.map((pair) => this.withSparkline(pair));
+      this.everLoaded = true;
+      this.onPairs(this.pairs);
+      this.onStatus(stale ? 'stale' : 'live', { ageMs });
+    } catch {
+      // Nothing cached and the request failed.
+      if (this.everLoaded) {
+        this.onStatus('offline');
+      } else {
+        this.fallBackToSeeded();
+      }
+    }
+  }
 
-    if (changed) this.onPairs(this.pairs);
+  /** Assemble the board from the boosted feed plus the major-asset searches. */
+  private async loadBoard(): Promise<Pair[]> {
+    const requests = [
+      fetchBoostedPairs(30),
+      ...SEED_QUERIES.map((query) => searchPairs(query)),
+    ];
+
+    // `allSettled`, not `all`: one failing query must not lose the whole board.
+    const results = await Promise.allSettled(requests);
+
+    const seen = new Map<string, Pair>();
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      for (const pair of result.value) {
+        const incumbent = seen.get(pair.id);
+        if (!incumbent || pair.liquidityUsd > incumbent.liquidityUsd) {
+          seen.set(pair.id, pair);
+        }
+      }
+    }
+
+    // Dust pools make the board unusable and are never tradeable.
+    return [...seen.values()]
+      .filter((pair) => pair.liquidityUsd >= 1_000)
+      .sort((a, b) => b.volume.h24 - a.volume.h24);
+  }
+
+  private fallBackToSeeded() {
+    if (this.pairs.length === 0) this.pairs = generatePairs();
+    this.onPairs(this.pairs);
+    this.onStatus('seeded');
   }
 
   /**
-   * Advance a random slice of the long tail.
+   * Attach a sparkline.
    *
-   * Only pairs *without* a live quote are walked — otherwise a simulated step
-   * would fight the real price arriving from the exchange. Step size scales
-   * with the pair's own 24h volatility so a stablecoin pair does not jitter
-   * like a fresh launch.
+   * DexScreener returns no price history, and fetching candles per row would
+   * blow through GeckoTerminal's 30/min limit instantly. So the line starts as
+   * a two-point interpolation between the price implied by the 24h change and
+   * the current price — honest about direction and magnitude, if not shape —
+   * and fills in with genuinely observed prices as the feed polls.
    */
-  private walk() {
-    const walkable: number[] = [];
-    this.pairs.forEach((pair, index) => {
-      // A pair is walkable unless the exchange is actively quoting it.
-      if (!this.liveSymbols.has(pair.baseToken.symbol.replace(/^W/, ''))) {
-        walkable.push(index);
-      }
-    });
-    if (walkable.length === 0) return;
+  private withSparkline(pair: Pair): Pair {
+    const observed = this.history.get(pair.id) ?? [];
+    observed.push(pair.priceUsd);
+    // Cap the rolling window so a long session cannot grow this without bound.
+    if (observed.length > 48) observed.shift();
+    this.history.set(pair.id, observed);
 
-    const moved = new Set<number>();
+    if (observed.length >= 3) return { ...pair, sparkline: observed };
 
-    const target = Math.max(1, Math.floor(walkable.length * WALK_SHARE));
-    for (let i = 0; i < target; i++) {
-      moved.add(walkable[this.rng.int(0, walkable.length - 1)]);
-    }
-    if (moved.size === 0) return;
+    const opening = pair.priceUsd / (1 + pair.change.h24 / 100);
+    return { ...pair, sparkline: [opening, ...observed] };
+  }
 
-    this.pairs = this.pairs.map((pair, index) => {
-      if (!moved.has(index)) return pair;
+  /** Overlay live exchange prices on the pairs the exchange actually quotes. */
+  private applyTickers(tickers: Map<string, Ticker>) {
+    if (this.pairs.length === 0) return;
+    let changed = false;
 
-      const volatility = Math.min(0.06, Math.abs(pair.change.h24) / 100 / 60 + 0.0008);
-      const step = this.rng.float(-1, 1) * volatility;
-      const priceUsd = Math.max(1e-12, pair.priceUsd * (1 + step));
-      const delta = step * 100;
+    this.pairs = this.pairs.map((pair) => {
+      const ticker = tickers.get(pair.baseToken.symbol.replace(/^W/, '').toUpperCase());
+      if (!ticker || ticker.priceUsd === pair.priceUsd) return pair;
 
-      return {
-        ...pair,
-        priceUsd,
-        change: {
-          m5: Number((pair.change.m5 + delta).toFixed(3)),
-          h1: Number((pair.change.h1 + delta * 0.5).toFixed(3)),
-          h6: Number((pair.change.h6 + delta * 0.2).toFixed(3)),
-          h24: Number((pair.change.h24 + delta * 0.1).toFixed(3)),
-        },
-        sparkline: [...pair.sparkline.slice(1), priceUsd],
-      };
+      changed = true;
+      return { ...pair, priceUsd: ticker.priceUsd };
     });
 
-    this.onPairs(this.pairs);
+    if (changed) this.onPairs(this.pairs);
   }
 }

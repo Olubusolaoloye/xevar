@@ -16,7 +16,7 @@ import { formatCompact, formatPercent, formatQuantity, truncateAddress } from '@
 import { CHAINS } from '@/data/chains';
 import { useCurrency } from '@/hooks/useCurrency';
 import { usePortfolioStore } from '@/store/usePortfolioStore';
-import { useLiveHoldings } from '@/hooks/useLiveHoldings';
+import { useLiveHoldings, useTrackedPositions } from '@/hooks/useLiveHoldings';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -106,8 +106,14 @@ function AddWalletModal({ open, onClose }: { open: boolean; onClose: () => void 
 
 export function Portfolio() {
   const wallets = usePortfolioStore((s) => s.wallets);
-  // Balances come from storage; prices come from the live board.
-  const holdings = useLiveHoldings();
+  // Balances come from storage; prices come from the live board. Positions
+  // recorded on pair pages join them, carrying a real user-entered cost basis.
+  const walletHoldings = useLiveHoldings();
+  const tracked = useTrackedPositions();
+  const holdings = useMemo(
+    () => [...walletHoldings, ...tracked],
+    [walletHoldings, tracked],
+  );
   const history = usePortfolioStore((s) => s.history);
   const removeWallet = usePortfolioStore((s) => s.removeWallet);
   const { compact: money, convert, symbol } = useCurrency();

@@ -39,7 +39,12 @@ function PairCardBase({ pair, rank, timeframe }: PairCardProps) {
           {rank}
         </span>
 
-        <TokenAvatar symbol={pair.baseToken.symbol} chain={pair.chain} size="md" />
+        <TokenAvatar
+          symbol={pair.baseToken.symbol}
+          chain={pair.chain}
+          src={pair.imageUrl}
+          size="md"
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">

@@ -61,6 +61,31 @@ function buildRows(security: SecuritySignals): CheckRow[] {
  * boilerplate; it is the honest description of what this panel can know.
  */
 export function SecurityPanel({ security }: { security: SecuritySignals }) {
+  // No contract-safety data from the live provider. Six red crosses would read
+  // as "this token failed every check" — the opposite of the truth, which is
+  // that nothing is known either way.
+  if (!security.available) {
+    return (
+      <div>
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <p className="flex items-center gap-2 font-display text-sm font-semibold text-ink">
+            <ShieldCheck className="h-4 w-4 text-ink-low" />
+            Risk signals
+          </p>
+          <span className="rounded-xs bg-raised px-1.5 py-0.5 font-mono text-[11px] font-semibold text-ink-low">
+            n/a
+          </span>
+        </div>
+        <p className="flex items-start gap-2 px-4 py-4 text-[11px] leading-relaxed text-ink-low">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-warn" />
+          Contract checks aren't available from the live market feed. Verify
+          liquidity locks, mint authority and holder concentration on a block
+          explorer or a dedicated contract scanner before trading.
+        </p>
+      </div>
+    );
+  }
+
   const rows = buildRows(security);
   const passed = rows.filter((row) => row.pass).length;
 

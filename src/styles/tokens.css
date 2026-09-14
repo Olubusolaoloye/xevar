@@ -14,60 +14,74 @@
    ========================================================================== */
 
 @theme {
-  /* --- Brand ramp ---------------------------------------------------------
-     The signature accent. Used with restraint: active navigation, primary
-     actions, focus rings, the live-data pulse and one hero gradient. If it is
-     everywhere it stops meaning anything. */
-  --color-brand-50:  #d7fff1;
-  --color-brand-100: #a8ffe2;
-  --color-brand-200: #6df8cd;
-  --color-brand-300: #35f0b8;
-  --color-brand-400: #0fe9a8;
-  --color-brand-500: #00e5a0;
-  --color-brand-600: #00b37e;
-  --color-brand-700: #00855e;
-  --color-brand-800: #005c41;
-  --color-brand-900: #003828;
+  /* --- Brand ramp -------------------------------------------------------
+     Blin Protocol's golden yellow, taken from the brand artwork. This is the
+     single most dominant colour in the identity, so it carries every primary
+     action, the active navigation state, focus rings and the live pulse.
+     Used with restraint everywhere else — a yellow this saturated stops
+     meaning "act here" the moment it appears twice on a screen. */
+  --color-brand-50:  #fef7de;
+  --color-brand-100: #fdecb6;
+  --color-brand-200: #fbdd7e;
+  --color-brand-300: #f9cf4c;
+  --color-brand-400: #f6c633;
+  --color-brand-500: #f4c22c;
+  --color-brand-600: #d9a410;
+  --color-brand-700: #a87d0b;
+  --color-brand-800: #745607;
+  --color-brand-900: #453304;
 
-  /* --- Canvas -------------------------------------------------------------
-     Five deliberate elevation steps. A screener lives or dies on whether the
-     eye can separate a row from a panel from the page behind it. */
-  /* NOTE: named `canvas`, not `base`. A `--color-base` token would make
+  /* --- Accent ramp ------------------------------------------------------
+     The brand's crimson. Secondary to the yellow: the wordmark, destructive
+     actions, and the "stop" end of any two-ended scale. */
+  --color-accent-300: #e75c64;
+  --color-accent-400: #de3b45;
+  --color-accent-500: #c9202b;
+  --color-accent-600: #a5161f;
+  --color-accent-700: #7c1017;
+
+  /* --- Canvas -----------------------------------------------------------
+     A warm near-black, biased brown rather than blue, so it sits under the
+     yellow as the artwork's own black sits under its yellow field. A cool
+     blue-black would make the accent read as acid instead of golden.
+
+     NOTE: named `canvas`, not `base`. A `--color-base` token would make
      Tailwind generate a `text-base` COLOR utility that silently shadows the
      built-in `text-base` FONT-SIZE utility — a collision that fails quietly. */
-  --color-canvas:    #07080a;  /* page */
-  --color-sunken:    #050608;  /* wells, inputs, code */
-  --color-surface:   #0d0f13;  /* panels, cards */
-  --color-raised:    #14171d;  /* hovered rows, popovers */
-  --color-overlay:   #1a1e26;  /* menus, modals, tooltips */
+  --color-canvas:    #0e0c0a;  /* page */
+  --color-sunken:    #090807;  /* wells, inputs, code */
+  --color-surface:   #16130f;  /* panels, cards */
+  --color-raised:    #1e1a15;  /* hovered rows, popovers */
+  --color-overlay:   #262119;  /* menus, modals, tooltips */
 
-  /* --- Hairlines ----------------------------------------------------------
+  /* --- Hairlines --------------------------------------------------------
      Borders do the structural work in this design. Three weights only. */
-  --color-line:        #1b1f27;  /* default 1px separator */
-  --color-line-strong: #262c37;  /* panel edges, active state */
-  --color-line-soft:   #121519;  /* table row dividers, near-invisible */
+  --color-line:        #26211a;  /* default 1px separator */
+  --color-line-strong: #332c22;  /* panel edges, active state */
+  --color-line-soft:   #1a1611;  /* table row dividers, near-invisible */
 
-  /* --- Ink ---------------------------------------------------------------- */
-  --color-ink:      #f2f5f9;  /* primary text, numbers that matter */
-  --color-ink-mid:  #aab3c2;  /* secondary text, labels */
-  --color-ink-low:  #6b7483;  /* meta, timestamps, units */
-  --color-ink-dim:  #454c58;  /* disabled, empty-state, axis ticks */
+  /* --- Ink ---------------------------------------------------------------
+     Warm-biased greys. Neutral greys turn visibly blue against this canvas. */
+  --color-ink:      #f7f3ea;  /* primary text, numbers that matter */
+  --color-ink-mid:  #bdb3a2;  /* secondary text, labels */
+  --color-ink-low:  #857c6d;  /* meta, timestamps, units */
+  --color-ink-dim:  #574f44;  /* disabled, empty-state, axis ticks */
 
   /* --- Market semantics ---------------------------------------------------
      Gains and losses are NOT the brand color. Keeping them distinct from the
      accent is what stops a screener from turning into visual soup. */
-  --color-up:        #16c784;
-  --color-up-soft:   #16c7841f;
-  --color-down:      #ea3943;
-  --color-down-soft: #ea39431f;
-  --color-flat:      #6b7483;
+  --color-up:        #1dbf63;
+  --color-up-soft:   #1dbf631f;
+  --color-down:      #e03540;
+  --color-down-soft: #e035401f;
+  --color-flat:      #857c6d;
 
   /* --- Signal ------------------------------------------------------------- */
-  --color-warn:      #f5a623;
-  --color-warn-soft: #f5a6231f;
-  --color-info:      #4b8bff;
-  --color-info-soft: #4b8bff1f;
-  --color-danger:    #ea3943;
+  --color-warn:      #e8833a;
+  --color-warn-soft: #e8833a1f;
+  --color-info:      #5b93f5;
+  --color-info-soft: #5b93f51f;
+  --color-danger:    #c9202b;
 
   /* --- Chain identity -----------------------------------------------------
      Each supported network carries its own recognisable hue so a chain can be
@@ -104,7 +118,7 @@
   --shadow-panel:   0 1px 0 0 #ffffff08 inset, 0 1px 2px #00000080;
   --shadow-lifted:  0 1px 0 0 #ffffff0a inset, 0 8px 24px -6px #000000cc;
   --shadow-popover: 0 1px 0 0 #ffffff0d inset, 0 16px 48px -12px #000000e6;
-  --shadow-glow:    0 0 0 1px #00e5a033, 0 8px 32px -8px #00e5a040;
+  --shadow-glow:    0 0 0 1px #f4c22c33, 0 8px 32px -8px #f4c22c40;
 
   /* --- Motion -------------------------------------------------------------
      Fast enough to feel instant, slow enough to be legible. */
@@ -116,6 +130,6 @@
    directly by chart components and inline styles. */
 :root {
   --grid-line: #ffffff09;
-  --tape-up:   #16c784;
-  --tape-down: #ea3943;
+  --tape-up:   #1dbf63;
+  --tape-down: #e03540;
 }

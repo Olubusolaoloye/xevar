@@ -180,6 +180,7 @@ function buildSecurity(rng: Rng, isBlueChip: boolean, ageHours: number): Securit
 
   const locked = isBlueChip || good > 0.45;
   return {
+    available: true,
     liquidityLocked: locked,
     liquidityLockedPct: locked ? rng.float(72, 100) : rng.float(0, 38),
     mintRenounced: isBlueChip || good > 0.5,
