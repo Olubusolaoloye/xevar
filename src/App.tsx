@@ -11,7 +11,13 @@ import { NotFound } from '@/pages/NotFound';
 
 export default function App() {
   return (
-    <BrowserRouter>
+    /**
+     * The router has to know where the app is mounted. On a host that serves
+     * from a subpath (GitHub Pages project sites live at /<repo>/), leaving
+     * this at "/" means no route ever matches and every page renders the 404.
+     * Vite substitutes BASE_URL at build time from the `base` config.
+     */
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Overview />} />
