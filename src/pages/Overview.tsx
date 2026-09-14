@@ -143,18 +143,23 @@ function Hero() {
 export function Overview() {
   const pairs = useMarketStore((s) => s.pairs);
 
-  // Each list answers a different question, so each gets its own ranking and a
-  // liquidity floor that keeps untradeable dust out of the results.
-  const { gainers, losers, fresh, topVolume } = useMemo(() => {
-    const tradeable = pairs.filter((pair) => pair.liquidityUsd > 50_000);
+  /**
+   * The board is a curated list now, not a market-wide firehose, so there is no
+   * liquidity floor here: the user picked these tokens deliberately and
+   * filtering their own choices off their own overview would be wrong.
+   *
+   * The split into gainers / losers / newest only says something when there are
+   * enough tokens to rank. Below that it is three panels repeating the same
+   * rows, so a small board collapses to one list instead.
+   */
+  const { gainers, losers, fresh, topVolume, compact } = useMemo(() => {
+    const byChange = [...pairs].sort((a, b) => b.change.h24 - a.change.h24);
 
     return {
-      gainers: [...tradeable].sort((a, b) => b.change.h24 - a.change.h24).slice(0, 6),
-      losers: [...tradeable].sort((a, b) => a.change.h24 - b.change.h24).slice(0, 6),
-      fresh: [...pairs]
-        .filter((pair) => pair.liquidityUsd > 5_000)
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, 6),
+      compact: pairs.length < 6,
+      gainers: byChange.filter((p) => p.change.h24 > 0).slice(0, 6),
+      losers: [...byChange].reverse().filter((p) => p.change.h24 < 0).slice(0, 6),
+      fresh: [...pairs].sort((a, b) => b.createdAt - a.createdAt).slice(0, 6),
       topVolume: [...pairs].sort((a, b) => b.volume.h24 - a.volume.h24).slice(0, 12),
     };
   }, [pairs]);
@@ -167,50 +172,69 @@ export function Overview() {
       <div className="mx-auto max-w-7xl space-y-4 px-4 py-6 sm:px-6">
         <MarketPulse />
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Panel>
-            <PanelHeader
-              title="Top gainers"
-              subtitle="24 hours"
-              icon={<TrendingUp className="h-4 w-4 text-up" />}
-            />
-            <MiniPairList pairs={gainers} />
-          </Panel>
+        {!compact && (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Panel>
+              <PanelHeader
+                title="Top gainers"
+                subtitle="24 hours"
+                icon={<TrendingUp className="h-4 w-4 text-up" />}
+              />
+              <MiniPairList pairs={gainers} emptyMessage="Nothing is up today." />
+            </Panel>
 
-          <Panel>
-            <PanelHeader
-              title="Top losers"
-              subtitle="24 hours"
-              icon={<TrendingDown className="h-4 w-4 text-down" />}
-            />
-            <MiniPairList pairs={losers} />
-          </Panel>
+            <Panel>
+              <PanelHeader
+                title="Top losers"
+                subtitle="24 hours"
+                icon={<TrendingDown className="h-4 w-4 text-down" />}
+              />
+              <MiniPairList pairs={losers} emptyMessage="Nothing is down today." />
+            </Panel>
 
-          <Panel>
-            <PanelHeader
-              title="New pairs"
-              subtitle="Recently created"
-              icon={<Sparkles className="h-4 w-4 text-brand-500" />}
-            />
-            <MiniPairList pairs={fresh} showAge timeframe="h1" />
-          </Panel>
-        </div>
+            <Panel>
+              <PanelHeader
+                title="New pairs"
+                subtitle="Recently created"
+                icon={<Sparkles className="h-4 w-4 text-brand-500" />}
+              />
+              <MiniPairList pairs={fresh} showAge timeframe="h1" />
+            </Panel>
+          </div>
+        )}
 
         <Panel className="overflow-hidden">
           <PanelHeader
-            title="Highest volume"
-            subtitle="Across every tracked network"
+            title={compact ? 'Tracked tokens' : 'Highest volume'}
+            subtitle={
+              compact
+                ? 'Everything currently on your board'
+                : 'Across every tracked network'
+            }
             icon={<Activity className="h-4 w-4" />}
             action={
-              <Link to="/screener">
+              <Link to={compact ? '/admin' : '/screener'}>
                 <Button size="sm" variant="ghost">
-                  Full screener
+                  {compact ? 'Manage tokens' : 'Full screener'}
                   <ArrowRight className="h-3 w-3" />
                 </Button>
               </Link>
             }
           />
-          <PairTable pairs={topVolume} timeframe="h24" pageSize={12} />
+          <PairTable
+            pairs={topVolume}
+            timeframe="h24"
+            pageSize={12}
+            emptyTitle="No tokens on the board yet"
+            emptyDescription="Add the tokens you want to follow and their live prices will appear here."
+            emptyAction={
+              <Link to="/admin">
+                <Button size="sm" variant="primary">
+                  Add tokens
+                </Button>
+              </Link>
+            }
+          />
         </Panel>
       </div>
     </div>

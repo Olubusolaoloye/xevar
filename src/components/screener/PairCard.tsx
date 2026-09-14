@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { Star } from 'lucide-react';
+import { ShieldAlert, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatAge, formatCount } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -55,6 +55,9 @@ function PairCardBase({ pair, rank, timeframe }: PairCardProps) {
               <span className="shrink-0 text-xs text-ink-dim">
                 /{pair.quoteToken.symbol}
               </span>
+              {pair.tracked && !pair.tracked.pinned && (
+                <ShieldAlert className="h-3 w-3 shrink-0 text-warn" />
+              )}
             </span>
             <PriceText
               usd={pair.priceUsd}

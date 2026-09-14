@@ -1,14 +1,20 @@
 /**
  * The market feed.
  *
- * Composes the real providers into one board:
+ * DexScreener is the single source of price. Every figure on the board is the
+ * real on-chain pool state for a pair the user chose to track.
  *
- *   1. DexScreener supplies the pairs — real price, liquidity, volume, txns
- *      and market cap across every tracked chain. Free, keyless, ~300 req/min.
- *   2. Binance's websocket overlays sub-second prices on the majors, so the
- *      board keeps moving between polls instead of stepping once per interval.
- *   3. The seeded generator is a last resort, used only when the API has never
- *      answered — and the UI says so plainly rather than passing it off as real.
+ * There used to be a Binance websocket overlaying centralised-exchange prices
+ * on top. It has been removed, and deliberately so:
+ *
+ *   - A DEX pair's price *is* its pool price. Replacing it with a CEX quote for
+ *     a same-named asset reports a number that does not exist in that pool.
+ *   - The symbol match was worse than imprecise. It stripped a leading "W"
+ *     from every ticker to turn WETH into ETH, which also turned WKC into KC —
+ *     so a token could be repriced from an entirely unrelated listing that
+ *     happened to share the shortened symbol.
+ *
+ * Sub-second ticks are not worth a wrong price.
  *
  * Every request goes through the stale-while-revalidate cache, so a slow
  * response, a rate limit, or a few seconds of lost connectivity keeps the last
@@ -16,9 +22,8 @@
  */
 
 import { cached } from './cache';
-import { BinanceTickerSource, type Ticker } from './sources/binance';
-import { fetchBoostedPairs, searchPairs } from './sources/dexscreener';
-import { generatePairs } from './sources/mock';
+import { fetchTokenPairs, fetchTokensByAddress, searchPairs } from './sources/dexscreener';
+import { useRegistryStore, type TrackedToken } from '@/store/useRegistryStore';
 import type { FeedStatus, Pair } from './types';
 
 /** How often the board is refreshed from DexScreener. */
@@ -28,12 +33,24 @@ const FRESH_MS = 20_000;
 /** Beyond this the cached board is too old to keep showing. */
 const MAX_STALE_MS = 10 * 60_000;
 
-/**
- * DexScreener has no "list every pair" endpoint, so the board is assembled
- * from the boosted/trending feed plus searches for the major quote assets —
- * which is what surfaces the deepest, most-traded pools on each chain.
- */
-const SEED_QUERIES = ['SOL', 'WETH', 'USDC', 'WBNB', 'cbBTC', 'ARB'];
+/** The multi-token endpoint accepts at most this many addresses per call. */
+const ADDRESS_BATCH = 30;
+
+/** Pick the pool worth quoting: the pinned one, else the deepest. */
+function choosePool(candidates: Pair[], token: TrackedToken): Pair | null {
+  if (candidates.length === 0) return null;
+
+  if (token.pairAddress) {
+    const pinned = candidates.find(
+      (pair) => pair.pairAddress.toLowerCase() === token.pairAddress!.toLowerCase(),
+    );
+    if (pinned) return pinned;
+  }
+
+  return candidates.reduce((best, pair) =>
+    pair.liquidityUsd > best.liquidityUsd ? pair : best,
+  );
+}
 
 type PairsHandler = (pairs: Pair[]) => void;
 type StatusHandler = (status: FeedStatus, detail?: { ageMs: number }) => void;
@@ -41,7 +58,6 @@ type StatusHandler = (status: FeedStatus, detail?: { ageMs: number }) => void;
 export class MarketFeed {
   private pairs: Pair[] = [];
   private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private binance: BinanceTickerSource | null = null;
   private started = false;
   private everLoaded = false;
   /** Rolling observed prices per pair id, used to build real sparklines. */
@@ -64,19 +80,9 @@ export class MarketFeed {
     this.started = true;
 
     this.onStatus('connecting');
-    void this.refresh();
+    void this.load();
 
-    this.pollTimer = setInterval(() => void this.refresh(), POLL_INTERVAL_MS);
-
-    // Majors only; everything else moves on the poll.
-    this.binance = new BinanceTickerSource(
-      (tickers) => this.applyTickers(tickers),
-      () => {
-        // The websocket is an enhancement, not the source of truth — its
-        // connection state must not override what the board actually knows.
-      },
-    );
-    this.binance.connect();
+    this.pollTimer = setInterval(() => void this.load(), POLL_INTERVAL_MS);
   }
 
   stop() {
@@ -85,23 +91,21 @@ export class MarketFeed {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
-    this.binance?.dispose();
-    this.binance = null;
   }
 
-  /** Pull a fresh board, falling back through cache and then to seeded data. */
-  private async refresh() {
+  /** Force an immediate reload, ignoring the cache's freshness window. */
+  refresh() {
+    void this.load(true);
+  }
+
+  /** Pull a fresh board, falling back to the cache when the request fails. */
+  private async load(immediate = false) {
     try {
       const { value, stale, ageMs } = await cached(
         'board',
         () => this.loadBoard(),
-        { freshMs: FRESH_MS, maxStaleMs: MAX_STALE_MS },
+        { freshMs: immediate ? 0 : FRESH_MS, maxStaleMs: MAX_STALE_MS },
       );
-
-      if (value.length === 0) {
-        this.fallBackToSeeded();
-        return;
-      }
 
       this.pairs = value.map((pair) => this.withSparkline(pair));
       this.everLoaded = true;
@@ -112,42 +116,124 @@ export class MarketFeed {
       if (this.everLoaded) {
         this.onStatus('offline');
       } else {
-        this.fallBackToSeeded();
+        this.reportUnavailable();
       }
     }
   }
 
-  /** Assemble the board from the boosted feed plus the major-asset searches. */
+  /**
+   * Assemble the board from the tracked-token registry.
+   *
+   * Only tokens the user has chosen appear. That is the whole point of a
+   * curated board — a search-assembled one returns whatever happens to match a
+   * ticker, which on a DEX is frequently an impostor with the same symbol.
+   *
+   * Tokens pinned to a contract address are fetched by address, which cannot
+   * resolve to the wrong asset. Tokens with only a ticker are searched for and
+   * the deepest pool on the requested chain is taken — a best effort, flagged
+   * as unverified in the UI so it is never mistaken for a confirmed match.
+   */
   private async loadBoard(): Promise<Pair[]> {
-    const requests = [
-      fetchBoostedPairs(30),
-      ...SEED_QUERIES.map((query) => searchPairs(query)),
-    ];
+    const tokens = [...useRegistryStore.getState().tokens].sort(
+      (a, b) => a.order - b.order,
+    );
+    if (tokens.length === 0) return [];
 
-    // `allSettled`, not `all`: one failing query must not lose the whole board.
+    const pinned = tokens.filter((t) => t.address);
+    const unpinned = tokens.filter((t) => !t.address);
+
+    // Group pinned tokens by chain so each chain costs one request.
+    const byChain = new Map<Pair['chain'], string[]>();
+    for (const token of pinned) {
+      const bucket = byChain.get(token.chain) ?? [];
+      if (bucket.length < ADDRESS_BATCH) bucket.push(token.address!);
+      byChain.set(token.chain, bucket);
+    }
+
+    const requests: Array<Promise<{ token?: TrackedToken; pairs: Pair[] }>> = [];
+
+    for (const [chain, addresses] of byChain) {
+      requests.push(
+        fetchTokensByAddress(chain, addresses).then((pairs) => ({ pairs })),
+      );
+    }
+
+    for (const token of unpinned) {
+      requests.push(
+        searchPairs(token.symbol).then((pairs) => ({
+          token,
+          // A ticker is not unique across chains, so the chain narrows it.
+          pairs: pairs.filter(
+            (pair) =>
+              pair.chain === token.chain &&
+              pair.baseToken.symbol.toUpperCase() === token.symbol.toUpperCase(),
+          ),
+        })),
+      );
+    }
+
+    // `allSettled`: one unreachable token must not empty the whole board.
     const results = await Promise.allSettled(requests);
 
-    const seen = new Map<string, Pair>();
+    // If every request failed, this is a feed outage — not a board with no
+    // matches. Returning an empty array here would resolve successfully and be
+    // reported as "Live" with nothing on screen, which states the opposite of
+    // the truth. Throwing lets the caller fall back to cache and say "offline".
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    if (requests.length > 0 && succeeded === 0) {
+      throw new Error('Every market request failed');
+    }
+
+    const pooled: Pair[] = [];
+    const searched = new Map<string, Pair[]>();
+
     for (const result of results) {
       if (result.status !== 'fulfilled') continue;
-      for (const pair of result.value) {
-        const incumbent = seen.get(pair.id);
-        if (!incumbent || pair.liquidityUsd > incumbent.liquidityUsd) {
-          seen.set(pair.id, pair);
-        }
+      if (result.value.token) {
+        searched.set(result.value.token.id, result.value.pairs);
+      } else {
+        pooled.push(...result.value.pairs);
       }
     }
 
-    // Dust pools make the board unusable and are never tradeable.
-    return [...seen.values()]
-      .filter((pair) => pair.liquidityUsd >= 1_000)
-      .sort((a, b) => b.volume.h24 - a.volume.h24);
+    const board: Pair[] = [];
+
+    for (const token of tokens) {
+      const candidates = token.address
+        ? pooled.filter(
+            (pair) =>
+              pair.chain === token.chain &&
+              pair.baseToken.address.toLowerCase() === token.address!.toLowerCase(),
+          )
+        : (searched.get(token.id) ?? []);
+
+      const chosen = choosePool(candidates, token);
+      if (!chosen) continue;
+
+      board.push({
+        ...chosen,
+        // The user's own label wins over whatever the provider calls it.
+        baseToken: token.label
+          ? { ...chosen.baseToken, name: token.label }
+          : chosen.baseToken,
+        tracked: { tokenId: token.id, pinned: Boolean(token.address) },
+      });
+    }
+
+    return board;
   }
 
-  private fallBackToSeeded() {
-    if (this.pairs.length === 0) this.pairs = generatePairs();
+  /**
+   * Nothing usable came back.
+   *
+   * The board is left empty rather than filled with generated tokens. Showing
+   * invented prices beside a user's real tracked tokens is exactly the
+   * confusion this product must not create — the UI says the feed is
+   * unavailable instead.
+   */
+  private reportUnavailable() {
     this.onPairs(this.pairs);
-    this.onStatus('seeded');
+    this.onStatus(this.everLoaded ? 'stale' : 'offline');
   }
 
   /**
@@ -172,19 +258,4 @@ export class MarketFeed {
     return { ...pair, sparkline: [opening, ...observed] };
   }
 
-  /** Overlay live exchange prices on the pairs the exchange actually quotes. */
-  private applyTickers(tickers: Map<string, Ticker>) {
-    if (this.pairs.length === 0) return;
-    let changed = false;
-
-    this.pairs = this.pairs.map((pair) => {
-      const ticker = tickers.get(pair.baseToken.symbol.replace(/^W/, '').toUpperCase());
-      if (!ticker || ticker.priceUsd === pair.priceUsd) return pair;
-
-      changed = true;
-      return { ...pair, priceUsd: ticker.priceUsd };
-    });
-
-    if (changed) this.onPairs(this.pairs);
-  }
 }

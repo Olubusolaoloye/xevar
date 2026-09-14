@@ -247,6 +247,26 @@ export async function fetchTokenPairs(chain: ChainId, tokenAddress: string): Pro
   return mapMany(response);
 }
 
+/**
+ * Every pool for a set of token addresses on one chain.
+ *
+ * Looking a token up by contract is the only way to be certain which asset is
+ * being priced. Ticker collisions on a DEX are routine and frequently
+ * deliberate, so a symbol match is a guess and an address is not.
+ *
+ * The endpoint accepts up to 30 addresses per call.
+ */
+export async function fetchTokensByAddress(
+  chain: ChainId,
+  addresses: string[],
+): Promise<Pair[]> {
+  if (addresses.length === 0) return [];
+  const response = await getJson<WirePair[]>(
+    `${BASE}/tokens/v1/${chain}/${addresses.slice(0, 30).join(',')}`,
+  );
+  return mapMany(response);
+}
+
 interface BoostEntry {
   chainId: string;
   tokenAddress: string;

@@ -115,6 +115,15 @@ export interface Pair {
 
   /** Token logo from the provider, when it has one. */
   imageUrl?: string;
+
+  /**
+   * Which registry entry put this pair on the board.
+   *
+   * `pinned` means the token was fetched by contract address and is certainly
+   * the right asset. False means it was matched by ticker alone, which can
+   * resolve to an impostor sharing the symbol — the UI flags those.
+   */
+  tracked?: { tokenId: string; pinned: boolean };
 }
 
 /** A single fill on the tape. */

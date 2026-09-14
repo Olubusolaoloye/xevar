@@ -2,6 +2,7 @@ import {
   Bell,
   LayoutGrid,
   Radar,
+  SlidersHorizontal,
   Star,
   Wallet,
   type LucideIcon,
@@ -23,4 +24,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Watchlist', path: '/watchlist', icon: Star, hint: 'Pairs you are tracking' },
   { label: 'Portfolio', path: '/portfolio', icon: Wallet, hint: 'Wallet holdings and performance' },
   { label: 'Alerts', path: '/alerts', icon: Bell, hint: 'Price and liquidity triggers' },
+  { label: 'Admin', path: '/admin', icon: SlidersHorizontal, hint: 'Manage which tokens the board tracks' },
 ];
