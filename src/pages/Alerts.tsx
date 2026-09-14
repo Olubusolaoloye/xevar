@@ -1,142 +1,332 @@
-import { useState } from 'react';
-import { useStore } from '@/store/useStore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { motion, AnimatePresence } from 'motion/react';
-import { Bell, Plus, Trash2, Edit2, Activity, Wallet } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Bell, BellRing, Plus, Trash2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { formatAge, formatCompact } from '@/lib/format';
+import { useCurrency } from '@/hooks/useCurrency';
+import { useMarketStore } from '@/store/useMarketStore';
+import { usePortfolioStore } from '@/store/usePortfolioStore';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Input } from '@/components/ui/Input';
+import { Modal } from '@/components/ui/Modal';
+import { Panel, PanelHeader } from '@/components/ui/Panel';
+import { Toggle } from '@/components/ui/Toggle';
+import { ChainChip } from '@/components/ui/ChainChip';
+import { PageHeader } from '@/components/layout/PageHeader';
+import type { Alert, AlertComparator, AlertMetric, Pair } from '@/data/types';
 
-export function Alerts() {
-  const { alerts, toggleAlert } = useStore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+const METRIC_LABEL: Record<AlertMetric, string> = {
+  price: 'Price',
+  change24h: '24h change',
+  liquidity: 'Liquidity',
+  volume24h: '24h volume',
+};
+
+/** Read the value an alert watches off a pair. */
+function readMetric(pair: Pair, metric: AlertMetric): number {
+  switch (metric) {
+    case 'price':
+      return pair.priceUsd;
+    case 'change24h':
+      return pair.change.h24;
+    case 'liquidity':
+      return pair.liquidityUsd;
+    case 'volume24h':
+      return pair.volume.h24;
+  }
+}
+
+function describe(alert: Alert, format: (usd: number) => string): string {
+  const threshold =
+    alert.metric === 'change24h'
+      ? `${alert.threshold}%`
+      : format(alert.threshold);
+  return `${METRIC_LABEL[alert.metric]} goes ${alert.comparator} ${threshold}`;
+}
+
+function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pairs = useMarketStore((s) => s.pairs);
+  const addAlert = usePortfolioStore((s) => s.addAlert);
+
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<Pair | null>(null);
+  const [metric, setMetric] = useState<AlertMetric>('price');
+  const [comparator, setComparator] = useState<AlertComparator>('above');
+  const [threshold, setThreshold] = useState('');
+
+  const matches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return pairs
+      .filter(
+        (pair) =>
+          pair.baseToken.symbol.toLowerCase().includes(q) ||
+          pair.baseToken.name.toLowerCase().includes(q),
+      )
+      .slice(0, 6);
+  }, [search, pairs]);
+
+  const value = Number.parseFloat(threshold);
+  const valid = selected !== null && Number.isFinite(value);
+
+  const submit = () => {
+    if (!valid || !selected) return;
+    addAlert({
+      pairId: selected.id,
+      pairLabel: `${selected.baseToken.symbol} / ${selected.quoteToken.symbol}`,
+      chain: selected.chain,
+      metric,
+      comparator,
+      threshold: value,
+      enabled: true,
+    });
+    setSearch('');
+    setSelected(null);
+    setThreshold('');
+    onClose();
+  };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
+    <Modal open={open} onClose={onClose} title="New alert">
+      <div className="space-y-3 p-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Active Alerts</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Stay informed about price movements and wallet activity.</p>
+          <label className="mb-1.5 block text-xs font-medium text-ink-mid">Pair</label>
+          {selected ? (
+            <div className="flex items-center justify-between rounded-md border border-line bg-sunken px-3 py-2">
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-ink">
+                  {selected.baseToken.symbol}/{selected.quoteToken.symbol}
+                </span>
+                <ChainChip chain={selected.chain} compact />
+              </span>
+              <button
+                onClick={() => setSelected(null)}
+                className="text-xs text-ink-low transition-colors hover:text-ink"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <>
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search for a token…"
+                autoFocus
+              />
+              {matches.length > 0 && (
+                <ul className="mt-1.5 overflow-hidden rounded-md border border-line">
+                  {matches.map((pair) => (
+                    <li key={pair.id}>
+                      <button
+                        onClick={() => setSelected(pair)}
+                        className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-raised"
+                      >
+                        <span className="text-sm text-ink">
+                          {pair.baseToken.symbol}/{pair.quoteToken.symbol}
+                        </span>
+                        <ChainChip chain={pair.chain} compact />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span className="hidden sm:inline">Create Alert</span>
-        </button>
-      </div>
 
-      <div className="space-y-4">
-        <AnimatePresence>
-          {alerts.map((alert, index) => (
-            <motion.div
-              key={alert.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, delay: index * 0.1 }}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-ink-mid">Metric</label>
+            <select
+              value={metric}
+              onChange={(event) => setMetric(event.target.value as AlertMetric)}
+              className="h-9 w-full rounded-md border border-line bg-sunken px-2.5 text-sm text-ink focus:border-brand-500/50 focus:outline-none"
             >
-              <Card className="group">
-                <CardContent className="p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${alert.type === 'price' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' : 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'}`}>
-                      {alert.type === 'price' ? <Activity className="w-6 h-6" /> : <Wallet className="w-6 h-6" />}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{alert.message}</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 capitalize">{alert.type} Alert</p>
+              {(Object.keys(METRIC_LABEL) as AlertMetric[]).map((key) => (
+                <option key={key} value={key}>
+                  {METRIC_LABEL[key]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-ink-mid">
+              Condition
+            </label>
+            <select
+              value={comparator}
+              onChange={(event) => setComparator(event.target.value as AlertComparator)}
+              className="h-9 w-full rounded-md border border-line bg-sunken px-2.5 text-sm text-ink focus:border-brand-500/50 focus:outline-none"
+            >
+              <option value="above">Goes above</option>
+              <option value="below">Goes below</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-ink-mid">
+            Threshold
+          </label>
+          <Input
+            value={threshold}
+            onChange={(event) => setThreshold(event.target.value)}
+            onKeyDown={(event) => event.key === 'Enter' && submit()}
+            inputMode="decimal"
+            placeholder={metric === 'change24h' ? '10' : '3000'}
+            suffix={
+              <span className="text-xs">{metric === 'change24h' ? '%' : 'USD'}</span>
+            }
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={submit} disabled={!valid}>
+            Create alert
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export function Alerts() {
+  const alerts = usePortfolioStore((s) => s.alerts);
+  const toggleAlert = usePortfolioStore((s) => s.toggleAlert);
+  const removeAlert = usePortfolioStore((s) => s.removeAlert);
+  const pairs = useMarketStore((s) => s.pairs);
+  const { compact: money, priceText } = useCurrency();
+
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const active = alerts.filter((alert) => alert.enabled).length;
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6">
+      <PageHeader
+        eyebrow="Monitoring"
+        title="Alerts"
+        description="Trigger conditions on price, liquidity and flow across any tracked pair."
+        action={
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New alert
+          </Button>
+        }
+      />
+
+      <Panel className="mt-5 overflow-hidden">
+        <PanelHeader
+          title="Your alerts"
+          subtitle={`${active} active of ${alerts.length}`}
+          icon={<Bell className="h-4 w-4" />}
+        />
+
+        {alerts.length === 0 ? (
+          <EmptyState
+            icon={<BellRing className="h-5 w-5" />}
+            title="No alerts yet"
+            description="Create a trigger and PanScreener will watch the condition against the live board."
+            action={
+              <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+                Create your first alert
+              </Button>
+            }
+          />
+        ) : (
+          <ul className="divide-y divide-line-soft">
+            {alerts.map((alert) => {
+              const pair = pairs.find((p) => p.id === alert.pairId);
+              const current = pair ? readMetric(pair, alert.metric) : null;
+
+              // An alert whose condition is already true right now is worth
+              // surfacing — it is about to fire, or just has.
+              const met =
+                current !== null &&
+                (alert.comparator === 'above'
+                  ? current > alert.threshold
+                  : current < alert.threshold);
+
+              return (
+                <li
+                  key={alert.id}
+                  className={cn(
+                    'flex items-center justify-between gap-3 px-4 py-3',
+                    !alert.enabled && 'opacity-55',
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={cn(
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border',
+                        met && alert.enabled
+                          ? 'border-warn/30 bg-warn/10 text-warn'
+                          : 'border-line bg-sunken text-ink-low',
+                      )}
+                    >
+                      <Bell className="h-4 w-4" />
+                    </span>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="truncate text-sm font-medium text-ink">
+                          {alert.pairLabel}
+                        </p>
+                        <ChainChip chain={alert.chain} compact />
+                        {met && alert.enabled && <Badge tone="warn">Condition met</Badge>}
+                        {alert.triggeredAt && (
+                          <Badge>Fired {formatAge(alert.triggeredAt)} ago</Badge>
+                        )}
+                      </div>
+
+                      <p className="truncate text-[11px] text-ink-low">
+                        {describe(alert, alert.metric === 'price' ? priceText : money)}
+                        {current !== null && (
+                          <span className="text-ink-dim">
+                            {' · now '}
+                            {alert.metric === 'change24h'
+                              ? `${current.toFixed(1)}%`
+                              : alert.metric === 'price'
+                                ? priceText(current)
+                                : formatCompact(current, '$')}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Toggle
+                      checked={alert.enabled}
+                      onChange={() => toggleAlert(alert.id)}
+                    />
                     <button
-                      onClick={() => toggleAlert(alert.id)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${alert.active ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`}
+                      onClick={() => removeAlert(alert.id)}
+                      aria-label="Delete alert"
+                      className="rounded-sm p-1.5 text-ink-dim transition-colors hover:bg-down/10 hover:text-down"
                     >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alert.active ? 'translate-x-6' : 'translate-x-1'}`}
-                      />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800"
-            >
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Create New Alert</h2>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                  &times;
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Alert Type</label>
-                  <select className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 appearance-none text-slate-700 dark:text-slate-300">
-                    <option>Price Alert</option>
-                    <option>Wallet Activity</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Asset / Wallet</label>
-                  <select className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 appearance-none text-slate-700 dark:text-slate-300">
-                    <option>Ethereum (ETH)</option>
-                    <option>Bitcoin (BTC)</option>
-                    <option>Main Wallet</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Condition</label>
-                  <div className="flex gap-2">
-                    <select className="w-1/3 px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 appearance-none text-slate-700 dark:text-slate-300">
-                      <option>Drops below</option>
-                      <option>Rises above</option>
-                    </select>
-                    <div className="relative w-2/3">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400">$</span>
-                      <input
-                        type="number"
-                        placeholder="3000"
-                        className="w-full pl-8 pr-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800 rounded-xl transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  Save Alert
-                </button>
-              </div>
-            </motion.div>
-          </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </AnimatePresence>
+      </Panel>
+
+      <p className="mt-3 px-1 text-[11px] leading-relaxed text-ink-dim">
+        Alerts evaluate against the in-app board while PanScreener is open. Push
+        and email delivery are not wired up in this build.
+      </p>
+
+      <CreateAlertModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }

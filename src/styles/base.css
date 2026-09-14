@@ -1,0 +1,173 @@
+/* ============================================================================
+   PANSCREENER — BASE LAYER
+   Global resets, scrollbars, and the motion vocabulary shared across the app.
+   Nothing here declares a color literal that isn't already a token.
+   ========================================================================== */
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    background: var(--color-canvas);
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    font-variant-ligatures: contextual;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none;
+  }
+
+  /* Every number in a screener must sit in a fixed-width column. Tabular
+     figures stop values from jittering horizontally as they tick. */
+  .tnum,
+  table,
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  ::selection {
+    background: var(--color-brand-500);
+    color: var(--color-canvas);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* Thin, self-effacing scrollbars — the data is the subject, not the chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-dim);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  /* --- Live price tick ----------------------------------------------------
+     The single most important micro-interaction in the product. When a price
+     changes, its cell washes green or red and decays over 900ms. It turns a
+     static table into something visibly alive. */
+  @keyframes tick-up {
+    0%   { background-color: var(--color-up-soft);   color: var(--color-up); }
+    100% { background-color: transparent;            color: inherit; }
+  }
+  @keyframes tick-down {
+    0%   { background-color: var(--color-down-soft); color: var(--color-down); }
+    100% { background-color: transparent;            color: inherit; }
+  }
+  .tick-up   { animation: tick-up   900ms var(--ease-out-quint); }
+  .tick-down { animation: tick-down 900ms var(--ease-out-quint); }
+
+  /* --- Live indicator ----------------------------------------------------- */
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0 var(--color-brand-500); opacity: 0.9; }
+    70%  { box-shadow: 0 0 0 6px transparent;          opacity: 0.9; }
+    100% { box-shadow: 0 0 0 0 transparent;            opacity: 0.9; }
+  }
+  .pulse-ring { animation: pulse-ring 2s var(--ease-out-quint) infinite; }
+
+  /* --- Skeleton shimmer --------------------------------------------------- */
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      #ffffff0a 60%,
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+
+  /* --- Trending marquee ---------------------------------------------------
+     Pauses on hover so a ticker can actually be read and clicked. */
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .marquee-track {
+    animation: marquee 48s linear infinite;
+  }
+  .marquee-host:hover .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* --- Entrance ----------------------------------------------------------- */
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .rise { animation: rise 420ms var(--ease-out-quint) both; }
+
+  /* --- Aurora --------------------------------------------------------------
+     The signature backdrop motif: two slow, enormous, heavily-blurred brand
+     blooms drifting behind the hero. Subtle enough to read as depth rather
+     than decoration. */
+  @keyframes drift {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    33%      { transform: translate3d(4%, -6%, 0) scale(1.12); }
+    66%      { transform: translate3d(-5%, 4%, 0) scale(0.94); }
+  }
+  .aurora { animation: drift 26s var(--ease-out-quint) infinite; }
+
+  /* --- Hairline grid -------------------------------------------------------
+     Faint engineering graph paper. Used behind hero sections to suggest an
+     instrument panel. */
+  .grid-paper {
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Respect the user's motion preference across every animation above. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

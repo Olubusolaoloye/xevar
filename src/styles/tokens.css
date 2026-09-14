@@ -1,0 +1,121 @@
+/* ============================================================================
+   PANSCREENER — BRAND TOKENS
+   ----------------------------------------------------------------------------
+   THIS IS THE ONLY FILE YOU EDIT TO RE-SKIN THE ENTIRE APPLICATION.
+
+   Every surface, border, chart stroke and piece of text in PanScreener resolves
+   to a token declared below. Nothing downstream hardcodes a hex value. Swapping
+   in the official Blin Protocol palette is a single-file change: replace the
+   values in the `Brand ramp` and `Canvas` blocks and the whole product follows.
+
+   Tailwind v4 reads this `@theme` block and generates the matching utilities,
+   so `--color-brand-500` becomes `bg-brand-500`, `text-brand-500`,
+   `border-brand-500`, `ring-brand-500`, and so on.
+   ========================================================================== */
+
+@theme {
+  /* --- Brand ramp ---------------------------------------------------------
+     The signature accent. Used with restraint: active navigation, primary
+     actions, focus rings, the live-data pulse and one hero gradient. If it is
+     everywhere it stops meaning anything. */
+  --color-brand-50:  #d7fff1;
+  --color-brand-100: #a8ffe2;
+  --color-brand-200: #6df8cd;
+  --color-brand-300: #35f0b8;
+  --color-brand-400: #0fe9a8;
+  --color-brand-500: #00e5a0;
+  --color-brand-600: #00b37e;
+  --color-brand-700: #00855e;
+  --color-brand-800: #005c41;
+  --color-brand-900: #003828;
+
+  /* --- Canvas -------------------------------------------------------------
+     Five deliberate elevation steps. A screener lives or dies on whether the
+     eye can separate a row from a panel from the page behind it. */
+  /* NOTE: named `canvas`, not `base`. A `--color-base` token would make
+     Tailwind generate a `text-base` COLOR utility that silently shadows the
+     built-in `text-base` FONT-SIZE utility — a collision that fails quietly. */
+  --color-canvas:    #07080a;  /* page */
+  --color-sunken:    #050608;  /* wells, inputs, code */
+  --color-surface:   #0d0f13;  /* panels, cards */
+  --color-raised:    #14171d;  /* hovered rows, popovers */
+  --color-overlay:   #1a1e26;  /* menus, modals, tooltips */
+
+  /* --- Hairlines ----------------------------------------------------------
+     Borders do the structural work in this design. Three weights only. */
+  --color-line:        #1b1f27;  /* default 1px separator */
+  --color-line-strong: #262c37;  /* panel edges, active state */
+  --color-line-soft:   #121519;  /* table row dividers, near-invisible */
+
+  /* --- Ink ---------------------------------------------------------------- */
+  --color-ink:      #f2f5f9;  /* primary text, numbers that matter */
+  --color-ink-mid:  #aab3c2;  /* secondary text, labels */
+  --color-ink-low:  #6b7483;  /* meta, timestamps, units */
+  --color-ink-dim:  #454c58;  /* disabled, empty-state, axis ticks */
+
+  /* --- Market semantics ---------------------------------------------------
+     Gains and losses are NOT the brand color. Keeping them distinct from the
+     accent is what stops a screener from turning into visual soup. */
+  --color-up:        #16c784;
+  --color-up-soft:   #16c7841f;
+  --color-down:      #ea3943;
+  --color-down-soft: #ea39431f;
+  --color-flat:      #6b7483;
+
+  /* --- Signal ------------------------------------------------------------- */
+  --color-warn:      #f5a623;
+  --color-warn-soft: #f5a6231f;
+  --color-info:      #4b8bff;
+  --color-info-soft: #4b8bff1f;
+  --color-danger:    #ea3943;
+
+  /* --- Chain identity -----------------------------------------------------
+     Each supported network carries its own recognisable hue so a chain can be
+     identified peripherally, without reading the label. */
+  --color-chain-ethereum:  #7b8ff7;
+  --color-chain-solana:    #14f195;
+  --color-chain-bsc:       #f0b90b;
+  --color-chain-base:      #0052ff;
+  --color-chain-arbitrum:  #28a0f0;
+  --color-chain-polygon:   #8247e5;
+  --color-chain-avalanche: #e84142;
+  --color-chain-sui:       #4da2ff;
+
+  /* --- Type ---------------------------------------------------------------
+     Three families, each with one job. Display for headings and the wordmark,
+     sans for interface copy, mono for every single number on screen. */
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- Radii --------------------------------------------------------------
+     Restrained. Over-rounding reads as toy; this product should read as
+     instrument. */
+  --radius-xs:  4px;
+  --radius-sm:  6px;
+  --radius-md:  9px;
+  --radius-lg:  13px;
+  --radius-xl:  18px;
+  --radius-2xl: 26px;
+
+  /* --- Elevation ----------------------------------------------------------
+     On a near-black canvas, shadow alone is invisible. Every elevation pairs a
+     shadow with a 1px top highlight to catch an implied light source. */
+  --shadow-panel:   0 1px 0 0 #ffffff08 inset, 0 1px 2px #00000080;
+  --shadow-lifted:  0 1px 0 0 #ffffff0a inset, 0 8px 24px -6px #000000cc;
+  --shadow-popover: 0 1px 0 0 #ffffff0d inset, 0 16px 48px -12px #000000e6;
+  --shadow-glow:    0 0 0 1px #00e5a033, 0 8px 32px -8px #00e5a040;
+
+  /* --- Motion -------------------------------------------------------------
+     Fast enough to feel instant, slow enough to be legible. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Values that are not part of Tailwind's utility generation but are read
+   directly by chart components and inline styles. */
+:root {
+  --grid-line: #ffffff09;
+  --tape-up:   #16c784;
+  --tape-down: #ea3943;
+}
