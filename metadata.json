@@ -1,5 +1,5 @@
 {
-  "name": "Xevar",
-  "description": "A multi-chain crypto portfolio tracking dashboard that allows users to paste wallet addresses and instantly view their entire crypto holdings across blockchains.",
+  "name": "PanScreener",
+  "description": "A live multi-chain DEX screener. Streams pair-level price, liquidity, order flow and automated risk signals across eight networks into a single dense board, with wallet portfolio tracking and threshold alerts.",
   "requestFramePermissions": []
 }

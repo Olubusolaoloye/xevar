@@ -1,0 +1,224 @@
+/**
+ * The domain model for PanScreener.
+ *
+ * These types are the contract between the UI and whatever is supplying market
+ * data. A live on-chain API, the Binance websocket, and the seeded mock source
+ * all produce exactly these shapes, which is what makes the data source
+ * swappable without touching a single component.
+ */
+
+export type ChainId =
+  | 'ethereum'
+  | 'solana'
+  | 'bsc'
+  | 'base'
+  | 'arbitrum'
+  | 'polygon'
+  | 'avalanche'
+  | 'sui';
+
+/** The windows every rolling metric is reported over. */
+export type Timeframe = 'm5' | 'h1' | 'h6' | 'h24';
+
+export const TIMEFRAMES: readonly Timeframe[] = ['m5', 'h1', 'h6', 'h24'];
+
+export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
+  m5: '5M',
+  h1: '1H',
+  h6: '6H',
+  h24: '24H',
+};
+
+/** A value measured across each rolling window. */
+export type Windowed<T> = Record<Timeframe, T>;
+
+export interface TokenRef {
+  address: string;
+  name: string;
+  symbol: string;
+}
+
+export interface TxnCounts {
+  buys: number;
+  sells: number;
+}
+
+/**
+ * Automated contract checks. Presented as signals, never as a verdict — the
+ * UI is explicit that these are heuristics rather than an audit.
+ */
+export interface SecuritySignals {
+  liquidityLocked: boolean;
+  /** Percentage of liquidity locked or burned, 0–100. */
+  liquidityLockedPct: number;
+  mintRenounced: boolean;
+  ownershipRenounced: boolean;
+  verifiedContract: boolean;
+  /** Share of supply held by the top 10 wallets, 0–100. */
+  topHolderPct: number;
+  /** Sell tax as a percentage. */
+  sellTaxPct: number;
+  buyTaxPct: number;
+}
+
+/** A tradeable market: one base token against one quote token on one DEX. */
+export interface Pair {
+  id: string;
+  chain: ChainId;
+  /** Human-readable exchange name, e.g. "Uniswap V3". */
+  dex: string;
+  pairAddress: string;
+  baseToken: TokenRef;
+  quoteToken: TokenRef;
+
+  priceUsd: number;
+  /** Price denominated in the quote asset (ETH, SOL, BNB…). */
+  priceNative: number;
+
+  change: Windowed<number>;
+  volume: Windowed<number>;
+  txns: Windowed<TxnCounts>;
+
+  /** Distinct trading addresses over 24h. */
+  makers24h: number;
+  liquidityUsd: number;
+  fdv: number;
+  marketCap: number;
+
+  /** Pair creation time, in epoch milliseconds. */
+  createdAt: number;
+
+  /** Paid promotion count, mirroring the "boosts" concept on DEX screeners. */
+  boosts: number;
+  /** Trending rank, if the pair is currently trending. */
+  trendingRank?: number;
+
+  /** ~48 recent price points, for the inline row sparkline. */
+  sparkline: number[];
+
+  security: SecuritySignals;
+
+  socials: {
+    website?: string;
+    twitter?: string;
+    telegram?: string;
+  };
+}
+
+/** A single fill on the tape. */
+export interface Trade {
+  id: string;
+  timestamp: number;
+  side: 'buy' | 'sell';
+  priceUsd: number;
+  /** Trade size in base tokens. */
+  amount: number;
+  /** Trade size in USD. */
+  valueUsd: number;
+  maker: string;
+}
+
+/** One OHLC bar. */
+export interface Candle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Portfolio                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export interface Wallet {
+  id: string;
+  address: string;
+  label: string;
+  chains: ChainId[];
+  addedAt: number;
+}
+
+export interface Holding {
+  id: string;
+  walletId: string;
+  chain: ChainId;
+  token: TokenRef;
+  balance: number;
+  priceUsd: number;
+  valueUsd: number;
+  change24h: number;
+  /** Average cost basis per token, when known. */
+  costBasis?: number;
+}
+
+export interface PortfolioPoint {
+  time: number;
+  valueUsd: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Alerts                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export type AlertMetric = 'price' | 'change24h' | 'liquidity' | 'volume24h';
+export type AlertComparator = 'above' | 'below';
+
+export interface Alert {
+  id: string;
+  pairId: string;
+  /** Denormalised for display, so the alert list renders without a lookup. */
+  pairLabel: string;
+  chain: ChainId;
+  metric: AlertMetric;
+  comparator: AlertComparator;
+  threshold: number;
+  enabled: boolean;
+  createdAt: number;
+  triggeredAt?: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Screener query                                                             */
+/* -------------------------------------------------------------------------- */
+
+export type SortKey =
+  | 'trending'
+  | 'priceUsd'
+  | 'change'
+  | 'volume'
+  | 'txns'
+  | 'makers24h'
+  | 'liquidityUsd'
+  | 'marketCap'
+  | 'createdAt';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface ScreenerFilters {
+  /** Empty array means "every chain". */
+  chains: ChainId[];
+  dexes: string[];
+  search: string;
+  minLiquidity: number | null;
+  maxLiquidity: number | null;
+  minVolume24h: number | null;
+  minMarketCap: number | null;
+  maxMarketCap: number | null;
+  /** Maximum pair age in hours. `null` is any age. */
+  maxAgeHours: number | null;
+  minTxns24h: number | null;
+  /** Only pairs whose liquidity is locked. */
+  liquidityLockedOnly: boolean;
+}
+
+export interface ScreenerQuery extends ScreenerFilters {
+  sortKey: SortKey;
+  sortDirection: SortDirection;
+  /** The window that `change`, `volume` and `txns` sorting refer to. */
+  timeframe: Timeframe;
+}
+
+/** Connection state of the live feed, surfaced in the top bar. */
+export type FeedStatus = 'connecting' | 'live' | 'reconnecting' | 'offline';
