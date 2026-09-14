@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "comment": "Single-page app: the client router owns every path, so all of them must serve index.html rather than 404.",
+      "source": "/((?!assets/|favicon.svg).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

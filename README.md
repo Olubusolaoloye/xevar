@@ -33,18 +33,52 @@ layer.
 
 ## Running it
 
+**Requires Node 18, 20, or 22+** (`.nvmrc` pins 20). Check with `node -v` — a
+Node older than 18 is the most common reason `npm run dev` fails.
+
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev          # http://localhost:3000
 ```
+
+Port 3000 busy? `npm run dev -- --port 5180`.
 
 ```bash
-npm run build      # typecheck, then production bundle
-npm run preview    # serve the built output
-npm run typecheck  # types only
+npm run build        # typecheck + tests, then production bundle
+npm run preview      # serve the built output
+npm run typecheck    # types only
+npm test             # unit tests
 ```
 
-No API keys and no environment variables are required.
+No API keys and no environment variables are required — the market APIs are
+public and keyless.
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Unexpected token '??='` or similar syntax error on `npm install` | Node too old | Upgrade to Node 20 (`nvm use`) |
+| `EADDRINUSE` | Port 3000 taken | `npm run dev -- --port 5180` |
+| Blank page, console shows a bare-module import error | Stale Vite cache | `rm -rf node_modules/.vite && npm run dev` |
+| Board shows **Demo data** | The market API is unreachable from your network | Check a corporate proxy or DNS filter is not blocking `api.dexscreener.com` |
+| Routes 404 after deploying | Host is not rewriting to `index.html` | Use the included `netlify.toml` / `vercel.json` |
+
+## Deploying
+
+The repo ships config for both major static hosts. Both build with
+`npm run build`, publish `dist`, and — critically — rewrite every path to
+`index.html`, without which a client-side route 404s on refresh.
+
+```bash
+# Netlify
+npx netlify-cli deploy --build --prod
+
+# Vercel
+npx vercel --prod
+```
+
+Or point either host's dashboard at this repo; the committed config is picked
+up automatically and every push to `main` redeploys.
 
 ## Architecture
 
