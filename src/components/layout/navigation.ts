@@ -2,7 +2,6 @@ import {
   Bell,
   LayoutGrid,
   Radar,
-  SlidersHorizontal,
   Star,
   Wallet,
   type LucideIcon,
@@ -24,5 +23,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Watchlist', path: '/watchlist', icon: Star, hint: 'Pairs you are tracking' },
   { label: 'Portfolio', path: '/portfolio', icon: Wallet, hint: 'Wallet holdings and performance' },
   { label: 'Alerts', path: '/alerts', icon: Bell, hint: 'Price and liquidity triggers' },
-  { label: 'Admin', path: '/admin', icon: SlidersHorizontal, hint: 'Manage which tokens the board tracks' },
 ];
+
+/**
+ * Routes that exist but are deliberately absent from the navigation.
+ *
+ * Admin is reached by URL and sits behind a passphrase — it is an operator
+ * screen, not somewhere a visitor browsing the market should land.
+ */
+export const HIDDEN_ROUTES = ['/admin'] as const;

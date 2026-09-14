@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/Badge';
 import { PriceChart } from '@/components/pair/PriceChart';
 import { TradeTape } from '@/components/pair/TradeTape';
 import { SecurityPanel } from '@/components/pair/SecurityPanel';
+import { VerdictPanel } from '@/components/pair/VerdictPanel';
 import { PnlCard } from '@/components/pair/PnlCard';
 import { ProfitCalculator } from '@/components/pair/ProfitCalculator';
 import type { Pair } from '@/data/types';
@@ -310,7 +311,11 @@ export function PairDetail() {
           </Panel>
 
           <Panel className="overflow-hidden">
-            <SecurityPanel security={pair.security} />
+            {pair.security.available ? (
+              <SecurityPanel security={pair.security} />
+            ) : (
+              <VerdictPanel pair={pair} />
+            )}
           </Panel>
 
           <Panel className="overflow-hidden">

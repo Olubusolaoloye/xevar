@@ -3,6 +3,9 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { AddTokenPanel } from '@/components/admin/AddTokenPanel';
 import { TrackedTokenList } from '@/components/admin/TrackedTokenList';
 import { FeedDiagnostics } from '@/components/admin/FeedDiagnostics';
+import { AdminGate } from '@/components/admin/AdminGate';
+import { SlideManager } from '@/components/admin/SlideManager';
+import { AdminSettings } from '@/components/admin/AdminSettings';
 
 /**
  * The admin screen.
@@ -13,6 +16,14 @@ import { FeedDiagnostics } from '@/components/admin/FeedDiagnostics';
  * resolved and what did not.
  */
 export function Admin() {
+  return (
+    <AdminGate>
+      <AdminScreen />
+    </AdminGate>
+  );
+}
+
+function AdminScreen() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
       <PageHeader
@@ -30,11 +41,19 @@ export function Admin() {
           <Panel className="overflow-hidden">
             <TrackedTokenList />
           </Panel>
+
+          <Panel className="overflow-hidden">
+            <SlideManager />
+          </Panel>
         </div>
 
         <div className="space-y-4">
           <Panel className="overflow-hidden">
             <FeedDiagnostics />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <AdminSettings />
           </Panel>
         </div>
       </div>

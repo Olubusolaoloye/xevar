@@ -23,13 +23,12 @@
 
 import { cached } from './cache';
 import { fetchTokenPairs, fetchTokensByAddress, searchPairs } from './sources/dexscreener';
+import { useAdminStore } from '@/store/useAdminStore';
 import { useRegistryStore, type TrackedToken } from '@/store/useRegistryStore';
 import type { FeedStatus, Pair } from './types';
 
-/** How often the board is refreshed from DexScreener. */
-const POLL_INTERVAL_MS = 30_000;
 /** Values younger than this are served straight from cache. */
-const FRESH_MS = 20_000;
+const FRESH_MS = 5_000;
 /** Beyond this the cached board is too old to keep showing. */
 const MAX_STALE_MS = 10 * 60_000;
 
@@ -59,6 +58,7 @@ export class MarketFeed {
   private pairs: Pair[] = [];
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private started = false;
+  private onVisibility: (() => void) | null = null;
   private everLoaded = false;
   /** Rolling observed prices per pair id, used to build real sparklines. */
   private history = new Map<string, number[]>();
@@ -81,8 +81,21 @@ export class MarketFeed {
 
     this.onStatus('connecting');
     void this.load();
+    this.schedulePoll();
 
-    this.pollTimer = setInterval(() => void this.load(), POLL_INTERVAL_MS);
+    // A hidden tab should not keep polling a rate-limited public API, but
+    // coming back to a stale board is worse — so refresh immediately on
+    // return rather than waiting out the next interval.
+    this.onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void this.load(true);
+        this.schedulePoll();
+      } else if (this.pollTimer) {
+        clearInterval(this.pollTimer);
+        this.pollTimer = null;
+      }
+    };
+    document.addEventListener('visibilitychange', this.onVisibility);
   }
 
   stop() {
@@ -91,6 +104,17 @@ export class MarketFeed {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    if (this.onVisibility) {
+      document.removeEventListener('visibilitychange', this.onVisibility);
+      this.onVisibility = null;
+    }
+  }
+
+  /** (Re)arm the poll at the interval currently configured in admin. */
+  private schedulePoll() {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    const seconds = useAdminStore.getState().pollSeconds;
+    this.pollTimer = setInterval(() => void this.load(), seconds * 1000);
   }
 
   /** Force an immediate reload, ignoring the cache's freshness window. */

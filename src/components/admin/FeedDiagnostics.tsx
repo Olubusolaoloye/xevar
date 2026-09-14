@@ -3,6 +3,7 @@ import { Activity, Download, RefreshCw, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatAge } from '@/lib/format';
 import { useMarketStore } from '@/store/useMarketStore';
+import { useAdminStore } from '@/store/useAdminStore';
 import { useRegistryStore, type TrackedToken } from '@/store/useRegistryStore';
 import { Button } from '@/components/ui/Button';
 import { PanelHeader } from '@/components/ui/Panel';
@@ -51,6 +52,7 @@ export function FeedDiagnostics() {
   const pairs = useMarketStore((s) => s.pairs);
   const refresh = useMarketStore((s) => s.refresh);
 
+  const pollSeconds = useAdminStore((s) => s.pollSeconds);
   const tokens = useRegistryStore((s) => s.tokens);
   const replaceAll = useRegistryStore((s) => s.replaceAll);
 
@@ -113,7 +115,8 @@ export function FeedDiagnostics() {
           </p>
           <p className="mt-1 text-xs leading-relaxed text-ink-mid">{copy.detail}</p>
           <p className="mt-1.5 font-mono text-[11px] text-ink-dim">
-            Last update {formatAge(updatedAt)} ago · DexScreener · polls every 30s
+            Last update {formatAge(updatedAt)} ago · DexScreener · polls every{' '}
+            {pollSeconds}s
           </p>
         </div>
 
