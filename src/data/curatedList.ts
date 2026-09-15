@@ -129,6 +129,26 @@ export function chooseFromSearch(address: string, results: Pair[]): Pair | null 
 }
 
 /**
+ * Which curated entries are not yet listed on the board.
+ *
+ * Matched on address alone, across every chain. A curated entry names no
+ * chain, so "is this already listed" cannot be asked per network — and an
+ * address that already appears in the listings means the admin has made this
+ * call once, whichever network they made it on.
+ */
+export function unlistedEntries(
+  entries: CuratedEntry[],
+  listedAddresses: Array<string | undefined>,
+): CuratedEntry[] {
+  const have = new Set(
+    listedAddresses
+      .filter((address): address is string => Boolean(address))
+      .map((address) => address.toLowerCase()),
+  );
+  return entries.filter((entry) => !have.has(entry.address.toLowerCase()));
+}
+
+/**
  * Session cache of address → resolved pair.
  *
  * Keyed by lowercased address. A null value is cached too: an address the

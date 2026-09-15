@@ -1,10 +1,31 @@
-import { useEffect, useState } from 'react';
-import { Check, GripVertical, ListStart, Plus, Trash2 } from 'lucide-react';
-import { isValidEntry, type CuratedEntry } from '@/data/curatedList';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, GripVertical, ListStart, Loader2, Plus, Trash2, Upload } from 'lucide-react';
+import {
+  isValidEntry,
+  resolveCuratedList,
+  unlistedEntries,
+  type CuratedEntry,
+} from '@/data/curatedList';
 import { adminBackend, useAdminStore } from '@/store/useAdminStore';
+import {
+  CATEGORY_LABEL,
+  listingBackend,
+  useListingStore,
+  type TokenCategory,
+} from '@/store/useListingStore';
+import { useMarketStore } from '@/store/useMarketStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PanelHeader } from '@/components/ui/Panel';
+
+const CATEGORIES = Object.keys(CATEGORY_LABEL) as TokenCategory[];
+
+/** What one address did when the list was pushed onto the board. */
+interface ListOutcome {
+  symbol: string;
+  ok: boolean;
+  detail: string;
+}
 
 /** Room for one screenful; matches the check constraint in migration 003. */
 const MAX_ENTRIES = 24;
@@ -32,6 +53,17 @@ export function CuratedListPanel() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const board = useMarketStore((s) => s.pairs);
+  const listed = useListingStore((s) => s.tokens);
+  const [category, setCategory] = useState<TokenCategory>('meme');
+  const [listing, setListing] = useState(false);
+  const [outcomes, setOutcomes] = useState<ListOutcome[] | null>(null);
+
+  const unlisted = useMemo(
+    () => unlistedEntries(storedTokens, listed.map((token) => token.address)),
+    [storedTokens, listed],
+  );
+
   // Another device's edit arrives over realtime. Take it: this form holds a
   // draft, and silently keeping a stale one would overwrite that edit on save.
   useEffect(() => setName(storedName), [storedName]);
@@ -56,6 +88,62 @@ export function CuratedListPanel() {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+
+  /**
+   * Put the whole list on the board.
+   *
+   * The chain comes from the provider, one address at a time, exactly as the
+   * watchlist resolves it — this screen never asks for a network and never
+   * infers one. An address the provider cannot place is reported rather than
+   * listed under a guess.
+   *
+   * Listings are created approved: this is the admin's own autolist, which is
+   * the power the paid-listing flow explicitly reserves. They carry no logo,
+   * blurb or links of their own, so the board shows the provider's metadata
+   * and no outbound links until somebody submits and an admin approves them.
+   */
+  const listOnBoard = async () => {
+    setListing(true);
+    setOutcomes(null);
+
+    const rows = await resolveCuratedList(unlisted, board);
+    const resolved = rows.filter((row) => row.pair);
+
+    const inserted = await listingBackend.addMany(
+      resolved.map((row) => ({
+        chain: row.pair!.chain,
+        // The curated entry's address, not the provider's echo of it: this is
+        // the identity the operator supplied, and it is what the board pins to.
+        address: row.entry.address,
+        symbol: row.pair!.baseToken.symbol,
+        label: row.pair!.baseToken.name,
+        category,
+        pairAddress: row.pair!.pairAddress,
+        status: 'approved' as const,
+      })),
+    );
+
+    const byIndex = new Map(resolved.map((row, i) => [row.entry.address, inserted[i]]));
+
+    setOutcomes(
+      rows.map((row) => {
+        if (!row.pair) {
+          return {
+            symbol: row.entry.symbol,
+            ok: false,
+            detail: 'no live pool found',
+          };
+        }
+        const result = byIndex.get(row.entry.address);
+        return {
+          symbol: row.entry.symbol,
+          ok: Boolean(result?.ok),
+          detail: result?.ok ? `listed on ${row.pair.chain}` : (result?.error ?? 'failed'),
+        };
+      }),
+    );
+    setListing(false);
+  };
 
   const save = async () => {
     if (bad >= 0) {
@@ -210,6 +298,78 @@ export function CuratedListPanel() {
           lookalike on the wrong network. A visitor who removes the list keeps
           it hidden on that device, even after you edit it.
         </p>
+
+        {/* Put the list on the board ------------------------------------- */}
+        <div className="space-y-2.5 border-t border-line pt-3">
+          <div>
+            <p className="text-sm font-medium text-ink">Also list these on the board</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-ink-low">
+              Adds every token on this list to the main board as an approved
+              listing. The network is resolved per contract by the market
+              provider — nothing here assumes one.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              aria-label="Category for the tokens being listed"
+              value={category}
+              onChange={(event) => setCategory(event.target.value as TokenCategory)}
+              className="h-7 rounded-sm border border-line bg-sunken px-2 text-xs text-ink focus:border-brand-500/50 focus:outline-none"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABEL[c]}
+                </option>
+              ))}
+            </select>
+
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void listOnBoard()}
+              disabled={listing || dirty || unlisted.length === 0}
+            >
+              {listing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Resolving…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5" />
+                  List {unlisted.length || 'all'} on the board
+                </>
+              )}
+            </Button>
+
+            {/* Saving first, because the button lists what is stored, not the
+                draft on screen — silently listing the old set would be worse
+                than refusing. */}
+            {dirty && (
+              <span className="text-[11px] text-warn">Save the list first</span>
+            )}
+            {!dirty && unlisted.length === 0 && storedTokens.length > 0 && (
+              <span className="text-[11px] text-ink-low">All already listed</span>
+            )}
+          </div>
+
+          {outcomes && (
+            <ul className="space-y-1 rounded-sm border border-line bg-sunken px-3 py-2">
+              {outcomes.map((outcome) => (
+                <li
+                  key={outcome.symbol}
+                  className="flex items-center justify-between gap-2 text-[11px]"
+                >
+                  <span className="font-semibold text-ink-mid">{outcome.symbol}</span>
+                  <span className={outcome.ok ? 'text-up' : 'text-ink-low'}>
+                    {outcome.detail}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import {
   parseCuratedTokens,
   peekCuratedPair,
   resolveCuratedList,
+  unlistedEntries,
 } from './curatedList';
 import type { Pair } from './types';
 
@@ -257,5 +258,26 @@ describe('peekCuratedPair', () => {
 
   it('returns null rather than guessing for an unknown id', () => {
     expect(peekCuratedPair('bsc:nope')).toBeNull();
+  });
+});
+
+describe('unlistedEntries', () => {
+  const roster = [
+    { symbol: 'WKC', address: WKC },
+    { symbol: 'DTG', address: DTG },
+  ];
+
+  it('treats a listing as a match regardless of address casing', () => {
+    expect(unlistedEntries(roster, [WKC.toLowerCase()])).toEqual([roster[1]]);
+  });
+
+  it('matches across chains, because a curated entry names none', () => {
+    // The listing that already covers this contract may sit on any network.
+    // Asking per chain would list the same token a second time.
+    expect(unlistedEntries(roster, [WKC, DTG])).toEqual([]);
+  });
+
+  it('ignores symbol-only listings, which pin no contract', () => {
+    expect(unlistedEntries(roster, [undefined, undefined])).toEqual(roster);
   });
 });

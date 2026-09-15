@@ -346,6 +346,50 @@ export const listingBackend = {
     return { ok: true };
   },
 
+  /**
+   * List several tokens at once.
+   *
+   * Not a loop over `add`, because `add` derives each row's position from the
+   * store's current length — and over a batch the store is only updated by the
+   * websocket, asynchronously, so every insert in the loop would read the same
+   * stale count and land on the same position. Here the base is read once and
+   * each row gets its own offset.
+   *
+   * Reports per token rather than all-or-nothing: one address the provider
+   * cannot place should not cost the other ten.
+   */
+  async addMany(tokens: Array<Omit<Listing, 'id' | 'addedAt' | 'order'>>) {
+    const base = useListingStore.getState().tokens.length;
+
+    if (!supabase) {
+      const store = useListingStore.getState();
+      return tokens.map((token) => ({
+        symbol: token.symbol,
+        ...store.add(token),
+      }));
+    }
+
+    const results: Array<{ symbol: string; ok: boolean; error?: string }> = [];
+
+    for (const [index, token] of tokens.entries()) {
+      const { error } = await supabase
+        .from(TABLES.listings)
+        .insert({ ...toRow(token), position: base + index });
+
+      results.push({
+        symbol: token.symbol,
+        ok: !error,
+        error: error
+          ? error.code === '23505'
+            ? 'Already listed'
+            : 'Could not save — sign in as the admin'
+          : undefined,
+      });
+    }
+
+    return results;
+  },
+
   async update(id: string, patch: Partial<Listing>) {
     if (!supabase) return useListingStore.getState().update(id, patch);
     await supabase.from(TABLES.listings).update(toRow(patch)).eq('id', id);
