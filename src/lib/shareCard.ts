@@ -32,13 +32,23 @@ export const CARD_WIDTH = 1200;
 export const CARD_HEIGHT = 675;
 
 /**
- * Load an image for canvas use.
+ * Where the PanScreener mark lives.
+ *
+ * Built from BASE_URL rather than hardcoded, because the app is served from a
+ * subpath on GitHub Pages and from the root on Netlify — a leading-slash path
+ * would 404 on one of them.
+ */
+export function brandMarkUrl(): string {
+  return `${import.meta.env.BASE_URL}panlogo-mark.png`;
+}
+
+/**
+ * Load one image, with CORS, once.
  *
  * Requests CORS explicitly: without it a remote logo taints the canvas and
- * `toBlob` throws, which would break the whole card over a decoration. Any
- * failure resolves to null and the caller falls back to a drawn monogram.
+ * `toBlob` throws, which would break the whole card over a decoration.
  */
-function loadImage(url: string): Promise<HTMLImageElement | null> {
+function attemptLoad(url: string, timeoutMs: number): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const image = new Image();
     image.crossOrigin = 'anonymous';
@@ -46,8 +56,42 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
     image.onerror = () => resolve(null);
     image.src = url;
     // Never let a hanging request block the download.
-    setTimeout(() => resolve(null), 4000);
+    setTimeout(() => resolve(null), timeoutMs);
   });
+}
+
+/**
+ * Load an image for canvas use, working around the HTTP cache.
+ *
+ * The retry is the point. Every token logo on this page has already been
+ * fetched by an ordinary `<img>` in the avatar beside the price — a request
+ * sent *without* CORS, whose response the browser then caches without the
+ * `Access-Control-Allow-Origin` header it never asked for. When the card asks
+ * for that same URL with `crossOrigin`, the browser serves the cached copy,
+ * finds no CORS header on it, and fails the load. The image is fine, the
+ * server is fine, and the card silently falls back to a monogram — which is
+ * exactly the "the logo does not show" people report.
+ *
+ * So a failure is retried once with a cache-busting parameter, which forces a
+ * fresh request that does carry the CORS headers. Only if that also fails is
+ * the logo genuinely unavailable, and the caller draws a monogram.
+ */
+async function loadImage(url: string): Promise<HTMLImageElement | null> {
+  const direct = await attemptLoad(url, 4000);
+  if (direct) return direct;
+  return attemptLoad(withCacheBust(url), 4000);
+}
+
+/**
+ * Add a parameter that defeats the HTTP cache.
+ *
+ * Separated out and exported because getting the separator wrong is silent:
+ * token logo URLs already carry a query string (`…/bsc/0xabc.png?key=…`), and
+ * appending a second `?` produces a URL the CDN answers with a 400 — so the
+ * retry would fail for exactly the images it exists to rescue.
+ */
+export function withCacheBust(url: string, now = Date.now()): string {
+  return `${url}${url.includes('?') ? '&' : '?'}cors=${now}`;
 }
 
 function roundRect(
@@ -229,16 +273,38 @@ export async function renderCard(content: CardContent): Promise<Blob> {
     });
   }
 
-  // Footer
+  /* Footer: the PanScreener mark, then the wordmark beside it.
+
+     The real logo rather than the word alone. These cards are made to be
+     posted somewhere else, stripped of the page they came from, and a card
+     that only says "PanScreener" in text is a card nobody recognises at
+     thumbnail size in a timeline.
+
+     Loaded from the app's own origin, so unlike a token logo there is no CORS
+     question and no cache trap — but it is still allowed to fail, and the
+     wordmark simply shifts left if it does. A missing brand mark must never
+     cost somebody their card. */
+  const markSize = 34;
+  const baseline = CARD_HEIGHT - 52;
+  const mark = await loadImage(brandMarkUrl());
+  let wordmarkX = PAD;
+
+  if (mark) {
+    // drawImage takes the top-left corner; the text is positioned by its
+    // baseline, so the mark is nudged up to sit centred on the same line.
+    ctx.drawImage(mark, PAD, baseline - markSize + 6, markSize, markSize);
+    wordmarkX = PAD + markSize + 12;
+  }
+
   ctx.fillStyle = t.brand;
   ctx.font = '700 26px "Space Grotesk", system-ui, sans-serif';
-  ctx.fillText('PanScreener', PAD, CARD_HEIGHT - 52);
+  ctx.fillText('PanScreener', wordmarkX, baseline);
 
   if (content.footnote) {
     ctx.fillStyle = t.inkLow;
     ctx.font = '400 17px Inter, system-ui, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(content.footnote, CARD_WIDTH - PAD, CARD_HEIGHT - 52);
+    ctx.fillText(content.footnote, CARD_WIDTH - PAD, baseline);
     ctx.textAlign = 'left';
   }
 

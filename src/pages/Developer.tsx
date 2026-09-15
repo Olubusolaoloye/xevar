@@ -18,13 +18,14 @@ import {
 } from '@/data/listingStatus';
 import { hasBackend } from '@/lib/supabase';
 import { formatAge } from '@/lib/format';
-import { MIN_PASSWORD_LENGTH, useAuthStore } from '@/store/useAuthStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { CATEGORY_LABEL, type TokenCategory } from '@/store/useListingStore';
 import {
   useDeveloperStore,
   type DeveloperSubmission,
   type SubmissionDraft,
 } from '@/store/useDeveloperStore';
+import { AuthForm } from '@/components/auth/AuthForm';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -49,135 +50,6 @@ const STATUS_ICON: Record<ListingStatus, typeof Clock> = {
 
 /* -------------------------------------------------------------------------- */
 /* Sign in / sign up                                                          */
-/* -------------------------------------------------------------------------- */
-
-function DeveloperAuth() {
-  const { signUp, signInWithPassword } = useAuthStore();
-
-  const [mode, setMode] = useState<'in' | 'up'>('in');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-
-  const ready = email.trim().length > 3 && password.length > 0 && !busy;
-
-  const submit = async () => {
-    setBusy(true);
-    setError(null);
-    const result =
-      mode === 'up'
-        ? await signUp(email, password)
-        : await signInWithPassword(email, password);
-    setBusy(false);
-
-    if (!result.ok) {
-      setError(result.error ?? 'Something went wrong.');
-      return;
-    }
-    if (mode === 'up' && 'needsConfirmation' in result && result.needsConfirmation) {
-      setSent(true);
-    }
-  };
-
-  if (sent) {
-    return (
-      <Panel elevation="lifted" className="mx-auto mt-6 max-w-md overflow-hidden">
-        <div className="space-y-2 p-6 text-center">
-          <p className="font-display text-sm font-semibold text-ink">Check your inbox</p>
-          <p className="text-xs leading-relaxed text-ink-low">
-            If that address can be registered, a confirmation link is on its way.
-            Open it and you will land back here, signed in.
-          </p>
-        </div>
-      </Panel>
-    );
-  }
-
-  return (
-    <Panel elevation="lifted" className="mx-auto mt-6 max-w-md overflow-hidden">
-      <div className="flex border-b border-line">
-        {(['in', 'up'] as const).map((value) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setMode(value);
-              setError(null);
-            }}
-            className={
-              'flex-1 px-4 py-3 text-xs font-medium transition-colors ' +
-              (mode === value
-                ? 'border-b-2 border-brand-500 text-ink'
-                : 'text-ink-low hover:text-ink-mid')
-            }
-          >
-            {value === 'in' ? 'Sign in' : 'Create account'}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-3 p-5">
-        <div>
-          <label htmlFor="dev-email" className="mb-1.5 block text-xs font-medium text-ink-mid">
-            Email
-          </label>
-          <Input
-            id="dev-email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError(null);
-            }}
-            placeholder="you@project.xyz"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="dev-password" className="mb-1.5 block text-xs font-medium text-ink-mid">
-            Password
-          </label>
-          <Input
-            id="dev-password"
-            type="password"
-            autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={(e) => e.key === 'Enter' && ready && void submit()}
-          />
-          {mode === 'up' && (
-            <p className="mt-1 text-[11px] text-ink-dim">
-              At least {MIN_PASSWORD_LENGTH} characters.
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <p className="rounded-sm border border-down/25 bg-down/10 px-3 py-2 text-xs text-down">
-            {error}
-          </p>
-        )}
-
-        <Button
-          variant="primary"
-          size="lg"
-          className="w-full"
-          disabled={!ready}
-          onClick={() => void submit()}
-        >
-          {busy ? 'Working…' : mode === 'up' ? 'Create developer account' : 'Sign in'}
-        </Button>
-      </div>
-    </Panel>
-  );
-}
-
 /* -------------------------------------------------------------------------- */
 /* Payment instructions                                                       */
 /* -------------------------------------------------------------------------- */
@@ -555,7 +427,11 @@ export function Developer() {
            load is a payment address that can be screenshotted out of context,
            and the fee only means anything attached to a submission that an
            account owns. Sign in, then see what to send and where. */
-        <DeveloperAuth />
+        <AuthForm
+          idPrefix="dev"
+          signUpLabel="Create developer account"
+          className="mx-auto mt-6 max-w-md overflow-hidden"
+        />
       ) : (
         <div className="mt-5 space-y-4">
           <PaymentPanel />

@@ -4,6 +4,7 @@ import { useMarketFeed } from '@/hooks/useMarketFeed';
 import { useThemeEffect } from '@/hooks/useTheme';
 import { startListingSync, stopListingSync } from '@/store/useListingStore';
 import { startAdminSync, stopAdminSync } from '@/store/useAdminStore';
+import { stopReviewSync } from '@/store/useReviewStore';
 import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
@@ -27,6 +28,9 @@ export function AppShell() {
     return () => {
       stopListingSync();
       stopAdminSync();
+      // Reviews subscribe lazily, when a comparison asks for a token, so there
+      // is no matching start() — only this teardown.
+      stopReviewSync();
     };
   }, []);
 
