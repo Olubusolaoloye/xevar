@@ -12,6 +12,7 @@ import { Settings } from '@/pages/Settings';
 import { Admin } from '@/pages/Admin';
 import { Section } from '@/pages/Section';
 import { MultiChart } from '@/pages/MultiChart';
+import { Account } from '@/pages/Account';
 import { NotFound } from '@/pages/NotFound';
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="sections/:sectionId" element={<Section />} />
           <Route path="multichart" element={<MultiChart />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="account" element={<Account />} />
           <Route path="settings" element={<Settings />} />
           <Route path="404" element={<NotFound />} />
           <Route path="*" element={<Navigate to="/404" replace />} />

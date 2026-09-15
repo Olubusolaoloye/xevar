@@ -115,6 +115,13 @@ export interface AppSettingsRow {
   curated_list_name?: string;
   /** `{ symbol, address }` entries; the chain is resolved at display time. */
   curated_list_tokens?: unknown;
+
+  /* Arrive with migration 005; a project on an older schema omits them and
+     must read as open rather than throwing. */
+  /** The operator's switch. True closes the app to everyone but the admin. */
+  app_locked?: boolean;
+  lock_title?: string;
+  lock_message?: string;
 }
 
 

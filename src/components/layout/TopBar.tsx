@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Wordmark } from '@/components/brand/Logo';
 import { DisplayMenu } from './DisplayMenu';
@@ -10,17 +10,42 @@ import { DisplayMenu } from './DisplayMenu';
  * primary navigation, so it gets the widest element and the ⌘K shortcut rather
  * than being tucked into a corner.
  */
-export function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
+export function TopBar({
+  onOpenSearch,
+  onOpenNav,
+}: {
+  onOpenSearch: () => void;
+  onOpenNav: () => void;
+}) {
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas/85 px-3 backdrop-blur-xl sm:px-4">
-      {/* The rail owns the wordmark on desktop; below `lg` it lives here. */}
-      <NavLink to="/" className="lg:hidden" aria-label="PanScreener home">
+      {/* Below `lg` the rail is off-canvas, so this is the only way to it.
+          Above `lg` the rail is already on screen and the button would open a
+          drawer duplicating it. */}
+      <button
+        type="button"
+        onClick={onOpenNav}
+        aria-label="Open navigation"
+        className="-ml-1 shrink-0 rounded-md p-2 text-ink-low transition-colors hover:bg-raised hover:text-ink lg:hidden"
+      >
+        <Menu className="h-[18px] w-[18px]" strokeWidth={2} />
+      </button>
+
+      {/* The rail owns the wordmark on desktop; below `lg` it lives here.
+          It survives the hamburger arriving beside it because the search
+          field flexes — the brand is worth more than forty pixels of
+          placeholder text. */}
+      <NavLink to="/" className="shrink-0 lg:hidden" aria-label="PanScreener home">
         <Wordmark size="sm" />
       </NavLink>
 
       <button
         onClick={onOpenSearch}
-        className="group flex h-9 flex-1 items-center gap-2.5 rounded-md border border-line bg-sunken px-3 text-left transition-colors hover:border-line-strong sm:max-w-md"
+        /* min-w-0 is load-bearing: a flex item will not shrink below its
+           content's width without it, so on a 360px phone the placeholder
+           text held the search field open and pushed the display menu off
+           the right edge of the screen. */
+        className="group flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-md border border-line bg-sunken px-3 text-left transition-colors hover:border-line-strong sm:max-w-md"
       >
         <Search className="h-4 w-4 shrink-0 text-ink-dim transition-colors group-hover:text-ink-low" />
         <span className="flex-1 truncate text-sm text-ink-dim">

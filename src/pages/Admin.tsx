@@ -8,6 +8,7 @@ import { AdminGate } from '@/components/admin/AdminGate';
 import { SlideManager } from '@/components/admin/SlideManager';
 import { AdminSettings } from '@/components/admin/AdminSettings';
 import { CuratedListPanel } from '@/components/admin/CuratedListPanel';
+import { AppLockPanel } from '@/components/admin/AppLockPanel';
 
 /**
  * The admin screen.
@@ -60,6 +61,13 @@ function AdminScreen() {
         </div>
 
         <div className="space-y-4">
+          {/* Leads the side column: it is the only control here that takes the
+              whole product away from everybody, so it should not be found by
+              scrolling. */}
+          <Panel className="overflow-hidden" elevation="raised">
+            <AppLockPanel />
+          </Panel>
+
           <Panel className="overflow-hidden">
             <FeedDiagnostics />
           </Panel>
