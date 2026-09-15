@@ -20,6 +20,17 @@ export interface PriceParts {
   zeros: number;
   /** The significant digits, e.g. `"4821"` */
   digits: string;
+  /**
+   * The same number written out in full, e.g. `"$0.00000004821"`.
+   *
+   * Carried here rather than rebuilt by the caller. `lead` is subscript
+   * notation — its trailing `0` in `"$0.0"` is the placeholder the subscript
+   * count replaces, not a digit — so expanding a price by concatenating
+   * `lead + zeros + digits` yields one zero too many and a figure ten times
+   * too small. That is exactly what used to happen, in every title attribute,
+   * every screen-reader label and on the downloadable share card.
+   */
+  text: string;
 }
 
 /**
@@ -32,7 +43,7 @@ export interface PriceParts {
  */
 export function priceParts(value: number, symbol = '$'): PriceParts {
   if (!Number.isFinite(value) || value === 0) {
-    return { lead: `${symbol}0.00`, zeros: 0, digits: '' };
+    return { lead: `${symbol}0.00`, zeros: 0, digits: '', text: `${symbol}0.00` };
   }
 
   const sign = value < 0 ? '-' : '';
@@ -45,7 +56,8 @@ export function priceParts(value: number, symbol = '$'): PriceParts {
       minimumFractionDigits: 2,
       maximumFractionDigits: decimals,
     });
-    return { lead: `${sign}${symbol}${fixed}`, zeros: 0, digits: '' };
+    const flat = `${sign}${symbol}${fixed}`;
+    return { lead: flat, zeros: 0, digits: '', text: flat };
   }
 
   // Sub-dollar: count the zeros between the point and the first real digit.
@@ -59,20 +71,22 @@ export function priceParts(value: number, symbol = '$'): PriceParts {
 
   // Only worth compressing once there are enough zeros to hurt readability.
   if (leadingZeros >= 4) {
-    return { lead: `${sign}${symbol}0.0`, zeros: leadingZeros, digits: significant };
+    return {
+      lead: `${sign}${symbol}0.0`,
+      zeros: leadingZeros,
+      digits: significant,
+      // Note the difference from `lead`: the placeholder zero is not repeated.
+      text: `${sign}${symbol}0.${'0'.repeat(leadingZeros)}${significant}`,
+    };
   }
 
-  return {
-    lead: `${sign}${symbol}0.${'0'.repeat(leadingZeros)}${significant}`,
-    zeros: 0,
-    digits: '',
-  };
+  const expanded = `${sign}${symbol}0.${'0'.repeat(leadingZeros)}${significant}`;
+  return { lead: expanded, zeros: 0, digits: '', text: expanded };
 }
 
 /** Flat-string price, for places that cannot render a subscript (titles, alt). */
 export function formatPrice(value: number, symbol = '$'): string {
-  const { lead, zeros, digits } = priceParts(value, symbol);
-  return zeros > 0 ? `${lead}${'0'.repeat(zeros)}${digits}` : lead;
+  return priceParts(value, symbol).text;
 }
 
 /* -------------------------------------------------------------------------- */

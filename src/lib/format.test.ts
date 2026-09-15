@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatAge, formatAxisPrice, formatCompact, formatPercent, priceParts } from './format';
+import {
+  formatAge,
+  formatAxisPrice,
+  formatCompact,
+  formatPercent,
+  formatPrice,
+  priceParts,
+} from './format';
 
 describe('priceParts', () => {
   it('formats ordinary prices without a subscript', () => {
@@ -84,5 +91,54 @@ describe('formatAge', () => {
 
   it('never reports a negative age for a future timestamp', () => {
     expect(formatAge(now + 60_000, now)).toBe('0s');
+  });
+});
+
+describe('formatPrice', () => {
+  /** Read a formatted price back as a number. */
+  const parse = (text: string) => Number(text.replace(/[$€£₦,]/g, ''));
+
+  it('round-trips the value it was given', () => {
+    // The regression, and the assertion that would have caught it. `lead` is
+    // subscript notation: the trailing 0 in "$0.0" is the placeholder the
+    // subscript count replaces, not a digit. Expanding by concatenating
+    // lead + zeros + digits produced one zero too many, so every sub-penny
+    // price read ten times too small — in titles, in screen-reader labels,
+    // and on the downloadable share card.
+    for (const value of [
+      0.00004212, 0.00000003257, 0.000001, 0.0000005, 1.2e-9, 0.0123, 0.00123, 1.2345,
+    ]) {
+      const parsed = parse(formatPrice(value));
+      // Four significant digits are kept, so compare proportionally.
+      expect(Math.abs(parsed / value - 1)).toBeLessThan(0.01);
+    }
+  });
+
+  it('expands a subscript price with exactly the advertised zero count', () => {
+    const parts = priceParts(0.00000003257);
+    expect(parts.zeros).toBe(7);
+    // Seven zeros between the point and the digits — not eight.
+    expect(parts.text).toBe('$0.00000003257');
+    expect(formatPrice(0.00000003257)).toBe(parts.text);
+  });
+
+  it('agrees with the subscript parts it is built from', () => {
+    for (const value of [0.00004212, 0.0123, 3180, 0]) {
+      expect(formatPrice(value)).toBe(priceParts(value).text);
+    }
+  });
+
+  it('carries the currency symbol through', () => {
+    expect(formatPrice(0.00004212, '€')).toBe('€0.00004212');
+    expect(formatPrice(1500, '₦')).toBe('₦1,500.00');
+  });
+
+  it('keeps a negative sign ahead of the symbol', () => {
+    expect(formatPrice(-0.00004212)).toBe('-$0.00004212');
+  });
+
+  it('handles zero and non-finite input', () => {
+    expect(formatPrice(0)).toBe('$0.00');
+    expect(formatPrice(Number.NaN)).toBe('$0.00');
   });
 });
