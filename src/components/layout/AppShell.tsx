@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useAdminStore } from '@/store/useAdminStore';
 import { lockState } from '@/data/appLock';
 import { ComingSoon } from '@/pages/ComingSoon';
+import { Booting } from './Booting';
 import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
@@ -23,6 +24,7 @@ export function AppShell() {
   const { pathname } = useLocation();
 
   const locked = useAdminStore((s) => s.locked);
+  const settingsReady = useAdminStore((s) => s.settingsReady);
   const isAdmin = useAuthStore((s) => s.isAdmin);
   const authReady = useAuthStore((s) => s.ready);
 
@@ -98,17 +100,14 @@ export function AppShell() {
      board is unreadable through the API while closed. See appLock.ts. */
   const lock = lockState({
     locked,
+    settingsReady,
     isAdmin,
     authReady,
     pathname,
   });
 
   if (lock === 'closed') return <ComingSoon />;
-  if (lock === 'checking') {
-    // Neither the app nor the sign until the session resolves; showing either
-    // one flashes the wrong thing at somebody.
-    return <div className="min-h-screen bg-canvas" />;
-  }
+  if (lock === 'checking') return <Booting />;
 
   return (
     <div className="flex min-h-screen bg-canvas">

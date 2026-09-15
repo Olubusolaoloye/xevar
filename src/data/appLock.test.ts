@@ -1,12 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { isExemptPath, lockState } from './appLock';
 
-const base = { locked: true, isAdmin: false, authReady: true, pathname: '/screener' };
+const base = {
+  locked: true,
+  settingsReady: true,
+  isAdmin: false,
+  authReady: true,
+  pathname: '/screener',
+};
 
 describe('lockState', () => {
   it('shows the app when the switch is off, whoever is asking', () => {
     expect(lockState({ ...base, locked: false })).toBe('open');
     expect(lockState({ ...base, locked: false, authReady: false })).toBe('open');
+  });
+
+  it('draws nothing until the switch itself is known', () => {
+    /* The switch lives in the backend and lands after first paint. Rendering
+       the app in the meantime shows a closed product in full — board and all —
+       to exactly the person it is meant to shut out, then snaps away. */
+    expect(lockState({ ...base, settingsReady: false })).toBe('checking');
+    expect(lockState({ ...base, settingsReady: false, locked: false })).toBe('checking');
+    expect(lockState({ ...base, settingsReady: false, isAdmin: true })).toBe('checking');
+  });
+
+  it('never waits on the routes that lift the lock', () => {
+    // An operator during a backend outage must not land on a blank page.
+    expect(lockState({ ...base, settingsReady: false, pathname: '/account' })).toBe('open');
+    expect(lockState({ ...base, settingsReady: false, pathname: '/admin' })).toBe('open');
   });
 
   it('closes the app to an ordinary visitor', () => {

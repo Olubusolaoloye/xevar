@@ -102,6 +102,14 @@ interface AdminState {
 
   /** True while the app is closed to everyone but the admin. */
   locked: boolean;
+  /**
+   * Whether settings have been fetched at least once this session.
+   *
+   * The shell holds the app back until this is true, so the lock cannot be
+   * announced late. Without a backend there is nothing to fetch and it starts
+   * true, so a fork or a local checkout renders immediately.
+   */
+  settingsReady: boolean;
   lockTitle: string;
   lockMessage: string;
 
@@ -135,6 +143,7 @@ export const useAdminStore = create<AdminState>()(
          the app, with nothing they could do about it. The switch is read
          from the backend every time. */
       locked: false,
+      settingsReady: !hasBackend,
       lockTitle: DEFAULT_LOCK_TITLE,
       lockMessage: DEFAULT_LOCK_MESSAGE,
 
@@ -196,8 +205,9 @@ export const useAdminStore = create<AdminState>()(
       name: 'panscreener.admin',
       /* Everything except the lock. See the comment on `locked` above: a
          cached `true` would outlive the operator reopening the app. */
-      partialize: ({ locked, lockTitle, lockMessage, ...rest }) => {
+      partialize: ({ locked, settingsReady, lockTitle, lockMessage, ...rest }) => {
         void locked;
+        void settingsReady;
         void lockTitle;
         void lockMessage;
         return rest;
@@ -270,7 +280,18 @@ export function startAdminSync() {
       .select('*')
       .eq('id', 1)
       .maybeSingle();
-    if (error || !data) return;
+    /* Marked ready even when the fetch failed, and deliberately.
+
+       The shell holds the whole app back until this flips, so an unreachable
+       backend would otherwise leave every visitor on a blank screen forever.
+       A failed read means the lock is unknown, and unknown resolves to open —
+       the same way ps_app_open() treats a missing settings row. A lock that
+       does not engage is a far smaller failure than a product that will not
+       load. */
+    if (error || !data) {
+      useAdminStore.setState({ settingsReady: true });
+      return;
+    }
 
     const row = data as AppSettingsRow;
     useAdminStore.setState({
@@ -286,6 +307,7 @@ export function startAdminSync() {
       curatedName: row.curated_list_name || DEFAULT_CURATED_NAME,
       curatedTokens: parseCuratedTokens(row.curated_list_tokens),
       locked: Boolean(row.app_locked),
+      settingsReady: true,
       lockTitle: row.lock_title || DEFAULT_LOCK_TITLE,
       lockMessage: row.lock_message || DEFAULT_LOCK_MESSAGE,
     });
