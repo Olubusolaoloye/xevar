@@ -99,7 +99,7 @@ export interface Pair {
   /** Pair creation time, in epoch milliseconds. */
   createdAt: number;
 
-  /** Paid promotion count, mirroring the "boosts" concept on DEX screeners. */
+  /** Paid promotion count, mirroring the "boosts" concept the market provider reports. */
   boosts: number;
   /** Trending rank, if the pair is currently trending. */
   trendingRank?: number;
