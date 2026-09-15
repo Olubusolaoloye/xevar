@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { Wordmark } from '@/components/brand/Logo';
 import { useAdminStore } from '@/store/useAdminStore';
@@ -11,9 +10,10 @@ import { useAdminStore } from '@/store/useAdminStore';
  * to press things, and every one of those presses is a route that has to
  * refuse them individually.
  *
- * The one link out goes to the account screen, which stays open while the app
- * is closed — see data/appLock.ts. It is how the operator gets back in, and
- * it is dimmed rather than advertised because it is not for visitors.
+ * There is no way out of it and no link to one. The operator gets back in by
+ * going to /account or /admin directly, which stay reachable while the app is
+ * closed — see data/appLock.ts. A visible "operator sign-in" link only tells
+ * every visitor where the door is, and the people who need it already know.
  */
 export function ComingSoon() {
   const title = useAdminStore((s) => s.lockTitle);
@@ -47,12 +47,6 @@ export function ComingSoon() {
         </p>
       </div>
 
-      <Link
-        to="/account"
-        className="relative z-10 mt-16 text-[11px] text-ink-dim transition-colors hover:text-ink-low"
-      >
-        Operator sign-in
-      </Link>
     </div>
   );
 }

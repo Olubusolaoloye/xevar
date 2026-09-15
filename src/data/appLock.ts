@@ -44,20 +44,42 @@ export type LockState =
 export interface LockInput {
   /** The operator's switch, as read from app settings. */
   locked: boolean;
+  /**
+   * Whether app settings have been fetched at least once.
+   *
+   * Without this the lock leaks the product. The switch lives in the backend
+   * and arrives after first paint, so the store starts at `locked: false` and
+   * the app renders — the whole thing, board and all — and only then snaps to
+   * the closed screen. Anyone watching gets a good look at exactly what they
+   * were meant to be shut out of.
+   */
+  settingsReady: boolean;
   isAdmin: boolean;
   /** Whether the session lookup has finished — `isAdmin` is meaningless until it has. */
   authReady: boolean;
   pathname: string;
 }
 
-export function lockState({ locked, isAdmin, authReady, pathname }: LockInput): LockState {
-  if (!locked) return 'open';
-
-  // Checked before `authReady`: these routes are how an admin gets back in,
-  // so they must not sit behind a spinner waiting for a session that signing
-  // in is the only way to obtain.
+export function lockState({
+  locked,
+  settingsReady,
+  isAdmin,
+  authReady,
+  pathname,
+}: LockInput): LockState {
+  /* The always-open routes render immediately, without waiting for anything.
+     They carry no market data — one is a sign-in form, the other is the admin
+     screen behind its own gate — so there is nothing for them to leak, and
+     making the way back in wait on a fetch is how an operator ends up staring
+     at a blank page during an outage. */
   if (isExemptPath(pathname)) return 'open';
 
+  // Before the switch is known, assume nothing. Guessing open is the leak
+  // above; guessing closed flashes the closed sign at every visitor on a
+  // perfectly open app.
+  if (!settingsReady) return 'checking';
+
+  if (!locked) return 'open';
   if (!authReady) return 'checking';
   return isAdmin ? 'open' : 'closed';
 }
