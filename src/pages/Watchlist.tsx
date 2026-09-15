@@ -12,6 +12,7 @@ import { Stat } from '@/components/ui/Stat';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PairTable } from '@/components/screener/PairTable';
+import { CuratedList } from '@/components/watchlist/CuratedList';
 
 const TIMEFRAME_OPTIONS = TIMEFRAMES.map((tf) => ({
   value: tf,
@@ -43,54 +44,62 @@ export function Watchlist() {
         title="Watchlist"
         description="Pairs you have starred, updating live alongside the rest of the board."
         action={
-          watched.length > 0 ? (
-            <SegmentedControl<Timeframe>
-              options={TIMEFRAME_OPTIONS}
-              value={timeframe}
-              onChange={setTimeframe}
-              size="sm"
-            />
-          ) : undefined
+          <SegmentedControl<Timeframe>
+            options={TIMEFRAME_OPTIONS}
+            value={timeframe}
+            onChange={setTimeframe}
+            size="sm"
+          />
         }
       />
 
-      {watched.length > 0 && (
-        <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
-          <div className="bg-surface p-4">
-            <Stat label="Pairs watched" value={watched.length} />
-          </div>
-          <div className="bg-surface p-4">
-            <Stat label="Combined liquidity" value={money(summary.liquidity)} />
-          </div>
-          <div className="bg-surface p-4">
-            <Stat label="24h volume" value={money(summary.volume24h)} />
-          </div>
-          <div className="bg-surface p-4">
-            <Stat
-              label="Breadth"
-              value={`${summary.breadth.toFixed(0)}% green`}
-              detail={`${summary.gainers} up · ${summary.losers} down`}
-            />
-          </div>
-        </div>
-      )}
+      {/* One spacing container, so the page looks right whether or not the
+          curated list is there — three siblings each carrying their own top
+          margin leave a gap where a dismissed panel used to be. */}
+      <div className="mt-5 space-y-4">
+        {/* Above the starred table, not merged into it. These are somebody
+            else's picks, and a visitor should never have to work out which of
+            the rows in front of them they actually chose. */}
+        <CuratedList timeframe={timeframe} />
 
-      <Panel className="mt-4 overflow-hidden">
-        <PairTable
-          pairs={watched}
-          timeframe={timeframe}
-          emptyTitle="Your watchlist is empty"
-          emptyDescription="Star any listing from the screener and it will appear here, updating live."
-          emptyAction={
-            <Link to="/screener">
-              <Button variant="primary" size="sm">
-                <Star className="h-3.5 w-3.5" />
-                Browse the screener
-              </Button>
-            </Link>
-          }
-        />
-      </Panel>
+        {watched.length > 0 && (
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
+            <div className="bg-surface p-4">
+              <Stat label="Pairs watched" value={watched.length} />
+            </div>
+            <div className="bg-surface p-4">
+              <Stat label="Combined liquidity" value={money(summary.liquidity)} />
+            </div>
+            <div className="bg-surface p-4">
+              <Stat label="24h volume" value={money(summary.volume24h)} />
+            </div>
+            <div className="bg-surface p-4">
+              <Stat
+                label="Breadth"
+                value={`${summary.breadth.toFixed(0)}% green`}
+                detail={`${summary.gainers} up · ${summary.losers} down`}
+              />
+            </div>
+          </div>
+        )}
+
+        <Panel className="overflow-hidden">
+          <PairTable
+            pairs={watched}
+            timeframe={timeframe}
+            emptyTitle="Your watchlist is empty"
+            emptyDescription="Star any listing from the screener and it will appear here, updating live."
+            emptyAction={
+              <Link to="/screener">
+                <Button variant="primary" size="sm">
+                  <Star className="h-3.5 w-3.5" />
+                  Browse the screener
+                </Button>
+              </Link>
+            }
+          />
+        </Panel>
+      </div>
     </div>
   );
 }

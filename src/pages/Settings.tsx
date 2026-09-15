@@ -1,5 +1,6 @@
 import { Palette, SlidersHorizontal, Wallet } from 'lucide-react';
 import { CURRENCY_SYMBOL, usePrefsStore, type Currency } from '@/store/usePrefsStore';
+import { useAdminStore } from '@/store/useAdminStore';
 import { useScreenerStore } from '@/store/useScreenerStore';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -45,6 +46,9 @@ export function Settings() {
   const setCurrency = usePrefsStore((s) => s.setCurrency);
   const reduceFlash = usePrefsStore((s) => s.reduceFlash);
   const setReduceFlash = usePrefsStore((s) => s.setReduceFlash);
+  const curatedDismissed = usePrefsStore((s) => s.curatedDismissed);
+  const setCuratedDismissed = usePrefsStore((s) => s.setCuratedDismissed);
+  const curatedName = useAdminStore((s) => s.curatedName);
 
   const density = useScreenerStore((s) => s.density);
   const setDensity = useScreenerStore((s) => s.setDensity);
@@ -99,6 +103,23 @@ export function Settings() {
                 description="Turn off the green and red wash that plays when a price ticks. Your system's reduce-motion setting is always respected regardless of this."
               />
             </div>
+            {/* Only offered once it has been removed. A toggle for something
+                already on screen is noise; a way back is not. */}
+            {curatedDismissed && (
+              <Row
+                label={`Show the ${curatedName} list again`}
+                description="You removed this curated list from your watchlist on this device. Bring it back."
+                control={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCuratedDismissed(false)}
+                  >
+                    Restore
+                  </Button>
+                }
+              />
+            )}
           </div>
         </Panel>
 

@@ -104,4 +104,11 @@ export interface AppSettingsRow {
   verdict_name: string;
   verdict_url_template: string;
   verdict_enabled: boolean;
+  /* Optional because they arrive with migration 003. A project running an
+     older schema returns the row without them, and the app has to render
+     rather than throw. */
+  /** Name of the curated watchlist shown to every visitor. */
+  curated_list_name?: string;
+  /** `{ symbol, address }` entries; the chain is resolved at display time. */
+  curated_list_tokens?: unknown;
 }

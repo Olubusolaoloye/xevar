@@ -19,6 +19,7 @@ import {
 import { CHAINS } from '@/data/chains';
 import { TIMEFRAMES, TIMEFRAME_LABEL } from '@/data/types';
 import { useCurrency } from '@/hooks/useCurrency';
+import { peekCuratedPair } from '@/data/curatedList';
 import { useMarketStore } from '@/store/useMarketStore';
 import { useScreenerStore } from '@/store/useScreenerStore';
 import { Button } from '@/components/ui/Button';
@@ -131,7 +132,15 @@ function FlowPanel({ pair }: { pair: Pair }) {
 export function PairDetail() {
   const { pairId } = useParams<{ pairId: string }>();
   const pairs = useMarketStore((s) => s.pairs);
-  const pair = useMemo(() => pairs.find((p) => p.id === pairId), [pairs, pairId]);
+  // The board first, then the curated watchlist. A token on the curated list
+  // that the admin has not listed is absent from the board, and tapping its
+  // row is the most obvious thing a visitor does with a watchlist.
+  const pair = useMemo(
+    () =>
+      pairs.find((p) => p.id === pairId) ??
+      (pairId ? (peekCuratedPair(pairId) ?? undefined) : undefined),
+    [pairs, pairId],
+  );
 
   const watched = useScreenerStore((s) => (pairId ? s.watchlist.includes(pairId) : false));
   const toggleWatch = useScreenerStore((s) => s.toggleWatch);
