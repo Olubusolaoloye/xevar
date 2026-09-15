@@ -20,6 +20,7 @@ import { CHAINS } from '@/data/chains';
 import { TIMEFRAMES, TIMEFRAME_LABEL } from '@/data/types';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketStore } from '@/store/useMarketStore';
+import { useTokenHolders } from '@/hooks/usePairChart';
 import { useScreenerStore } from '@/store/useScreenerStore';
 import { Button } from '@/components/ui/Button';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
@@ -136,6 +137,10 @@ export function PairDetail() {
   const watched = useScreenerStore((s) => (pairId ? s.watchlist.includes(pairId) : false));
   const toggleWatch = useScreenerStore((s) => s.toggleWatch);
   const { compact: money, priceText } = useCurrency();
+  // Must sit above the early return below: a hook called conditionally throws
+  // "rendered more hooks than during the previous render" the moment a pair
+  // resolves. The hook no-ops while `pair` is undefined.
+  const { holders, loading: holdersLoading } = useTokenHolders(pair);
 
   if (!pair) {
     return (
@@ -209,7 +214,13 @@ export function PairDetail() {
               {pair.trendingRank && (
                 <Badge tone="warn">#{pair.trendingRank} trending</Badge>
               )}
-              {pair.tracked && !pair.tracked.pinned && (
+              {/* Verification is an admin's judgement that this is the real
+                  project. Pinning is a separate, narrower fact: that the board
+                  is quoting one specific contract rather than guessing from a
+                  ticker. Both are worth saying, and they are not the same
+                  claim. */}
+              {pair.tracked?.verified && <Badge tone="up">Verified</Badge>}
+              {pair.tracked && !pair.tracked.pinned && !pair.tracked.verified && (
                 <Badge tone="warn">Unverified ticker match</Badge>
               )}
             </div>
@@ -224,19 +235,25 @@ export function PairDetail() {
               </p>
             )}
 
+            {/* Shown, but deliberately not clickable.
+
+                A link out of a screener is the highest-trust thing on the
+                page: following one is how a visitor ends up approving a
+                contract. These destinations are supplied by whoever submitted
+                the listing, so until that submission has been paid for and
+                reviewed they are displayed as claims, not offered as
+                navigation. */}
             {socials.length > 0 && (
               <div className="mt-2.5 flex items-center gap-1.5">
                 {socials.map((social) => (
-                  <a
+                  <span
                     key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={social.label}
-                    className="rounded-sm border border-line bg-sunken p-1.5 text-ink-low transition-colors hover:border-line-strong hover:text-ink"
+                    aria-label={`${social.label} (link inactive)`}
+                    title="Links are inactive until the listing is reviewed"
+                    className="cursor-not-allowed rounded-sm border border-line bg-sunken p-1.5 text-ink-dim opacity-60"
                   >
                     <social.icon className="h-3.5 w-3.5" />
-                  </a>
+                  </span>
                 ))}
               </div>
             )}
@@ -315,18 +332,6 @@ export function PairDetail() {
         </div>
 
         <div className="space-y-4">
-          <Panel className="overflow-hidden" elevation="raised">
-            <PnlCard pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            <ProfitCalculator pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            <ShareCards pair={pair} />
-          </Panel>
-
           <Panel className="overflow-hidden">
             <PanelHeader title="Performance" />
             <ChangeGrid pair={pair} />
@@ -335,14 +340,6 @@ export function PairDetail() {
           <Panel className="overflow-hidden">
             <PanelHeader title="Order flow" subtitle="Buy and sell pressure" />
             <FlowPanel pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            {pair.security.available ? (
-              <SecurityPanel security={pair.security} />
-            ) : (
-              <VerdictPanel pair={pair} />
-            )}
           </Panel>
 
           <Panel className="overflow-hidden">
@@ -358,6 +355,19 @@ export function PairDetail() {
                 address={pair.pairAddress}
                 explorer={chain.explorer}
               />
+              <div className="flex items-center justify-between px-4 py-2.5">
+                <span className="text-[11px] text-ink-low">Holders</span>
+                <span className="tnum font-mono text-[11px] text-ink-mid">
+                  {/* Null means the provider does not index holders for this
+                      token, which is common on newer pairs. A dash says so;
+                      a zero would read as a fact. */}
+                  {holdersLoading
+                    ? '…'
+                    : holders === null
+                      ? '—'
+                      : formatCount(holders)}
+                </span>
+              </div>
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-[11px] text-ink-low">Makers (24h)</span>
                 <span className="tnum font-mono text-[11px] text-ink-mid">
@@ -379,6 +389,26 @@ export function PairDetail() {
                 </span>
               </div>
             </div>
+          </Panel>
+
+          <Panel className="overflow-hidden" elevation="raised">
+            <PnlCard pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ProfitCalculator pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ShareCards pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            {pair.security.available ? (
+              <SecurityPanel security={pair.security} />
+            ) : (
+              <VerdictPanel pair={pair} />
+            )}
           </Panel>
 
           <p className="px-1 text-[11px] leading-relaxed text-ink-dim">

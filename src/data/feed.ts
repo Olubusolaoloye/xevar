@@ -22,6 +22,7 @@
  */
 
 import { extendSparkline } from '@/data/sparkline';
+import { listingPresentation } from '@/data/listingStatus';
 import { cached } from './cache';
 import { fetchTokenPairs, fetchTokensByAddress, searchPairs } from './sources/dexscreener';
 import { useAdminStore } from '@/store/useAdminStore';
@@ -236,23 +237,37 @@ export class MarketFeed {
       const chosen = choosePool(candidates, token);
       if (!chosen) continue;
 
-      // Operator overrides win over provider metadata, field by field, so a
-      // blank override never wipes out something the provider did supply.
+      /* Submitted presentation wins over provider metadata, field by field,
+         so a blank override never wipes out something the provider did
+         supply — but only once the listing is approved.
+
+         Everything in `shown` is null until then. That is the whole gate: a
+         contract address buys you market data, which is a fact about a public
+         pool; a logo, a banner, a description and outbound links are claims by
+         whoever submitted them, and they wait for a confirmed payment and a
+         human review. */
+      const shown = listingPresentation(token);
+
       board.push({
         ...chosen,
-        baseToken: token.label
-          ? { ...chosen.baseToken, name: token.label }
+        baseToken: shown.label
+          ? { ...chosen.baseToken, name: shown.label }
           : chosen.baseToken,
-        imageUrl: token.logoUrl || chosen.imageUrl,
-        coverUrl: token.coverUrl,
-        blurb: token.blurb,
+        imageUrl: shown.logoUrl ?? chosen.imageUrl,
+        coverUrl: shown.coverUrl ?? undefined,
+        blurb: shown.blurb ?? undefined,
         featured: Boolean(token.featured),
         socials: {
-          website: token.website || chosen.socials.website,
-          twitter: token.twitter || chosen.socials.twitter,
-          telegram: token.telegram || chosen.socials.telegram,
+          website: shown.website ?? chosen.socials.website,
+          twitter: shown.twitter ?? chosen.socials.twitter,
+          telegram: shown.telegram ?? chosen.socials.telegram,
         },
-        tracked: { tokenId: token.id, pinned: Boolean(token.address) },
+        tracked: {
+          tokenId: token.id,
+          pinned: Boolean(token.address),
+          verified: Boolean(token.verified),
+          status: token.status ?? 'tracking',
+        },
       });
     }
 

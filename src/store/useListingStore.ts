@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { hasBackend, supabase, TABLES, type ListingRow } from '@/lib/supabase';
 import type { ChainId } from '@/data/types';
+import type { ListingStatus } from '@/data/listingStatus';
 
 export type TokenCategory = 'meme' | 'defi' | 'infra' | 'stable' | 'other';
 
@@ -54,6 +55,32 @@ export interface Listing {
   addedAt: number;
   /** Manual sort position listed. */
   order: number;
+
+  /* --- Paid listing workflow ---------------------------------------------
+     Market data is tracked for any contract address. The presentation fields
+     above are withheld until a payment has been confirmed and an admin has
+     reviewed the submission — see data/listingStatus.ts. */
+
+  /** Defaults to 'tracking' wherever absent; never to 'approved'. */
+  status?: ListingStatus;
+  /**
+   * An admin's assertion that this is the token it claims to be.
+   *
+   * Separate from `address` being pinned: pinning proves the board is quoting
+   * one specific contract, which is a fact about the request. Verification is
+   * a judgement about whether that contract is the real project.
+   */
+  verified?: boolean;
+  /** Auth user id of the developer who submitted it, when not admin-created. */
+  ownerId?: string;
+  /** Payment transaction hash, as supplied by the developer. */
+  paymentTxHash?: string;
+  /** Contact address for the submitter, shown to the admin during review. */
+  contactEmail?: string;
+  submittedAt?: number;
+  reviewedAt?: number;
+  /** Why an admin declined, shown back to the developer. */
+  reviewNote?: string;
 }
 
 /**
@@ -81,8 +108,22 @@ export function isPinned(token: Listing): boolean {
  * screen, where the real pair can be picked from live search results.
  */
 const SEED: Array<Omit<Listing, 'id' | 'addedAt' | 'order'>> = [
-  { chain: 'bsc', symbol: 'WKC', label: 'Wiki Cat', category: 'meme' },
-  { chain: 'ethereum', symbol: 'BLIN', label: 'Blin', category: 'meme' },
+  {
+    chain: 'bsc',
+    symbol: 'WKC',
+    label: 'Wiki Cat',
+    category: 'meme',
+    status: 'approved',
+    verified: true,
+  },
+  {
+    chain: 'ethereum',
+    symbol: 'BLIN',
+    label: 'Blin',
+    category: 'meme',
+    status: 'approved',
+    verified: true,
+  },
 ];
 
 function seedTokens(): Listing[] {
@@ -198,6 +239,15 @@ function fromRow(row: ListingRow): Listing {
     featured: row.featured,
     addedAt: Date.parse(row.created_at),
     order: row.position,
+    // Absent defaults to 'tracking', never to 'approved'.
+    status: (row.status ?? 'tracking') as ListingStatus,
+    verified: row.verified ?? false,
+    ownerId: row.owner_id ?? undefined,
+    paymentTxHash: row.payment_tx_hash ?? undefined,
+    contactEmail: row.contact_email ?? undefined,
+    submittedAt: row.submitted_at ? Date.parse(row.submitted_at) : undefined,
+    reviewedAt: row.reviewed_at ? Date.parse(row.reviewed_at) : undefined,
+    reviewNote: row.review_note ?? undefined,
   };
 }
 
@@ -224,6 +274,12 @@ function toRow(token: Partial<Listing>) {
   put('telegram', token.telegram ?? null);
   put('featured', token.featured);
   put('position', token.order);
+  put('status', token.status);
+  put('verified', token.verified);
+  put('owner_id', token.ownerId);
+  put('payment_tx_hash', token.paymentTxHash ?? null);
+  put('contact_email', token.contactEmail ?? null);
+  put('review_note', token.reviewNote ?? null);
   return row;
 }
 

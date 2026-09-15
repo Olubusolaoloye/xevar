@@ -62,8 +62,22 @@ export async function fetchCandles(
     `?aggregate=${aggregate}&limit=${Math.min(1000, limit)}&currency=usd`;
 
   const response = await getJson<OhlcvResponse>(url);
-  const rows = response.data?.attributes?.ohlcv_list ?? [];
+  return mapOhlcvRows(response.data?.attributes?.ohlcv_list ?? []);
+}
 
+/**
+ * Turn raw `ohlcv_list` rows into candles.
+ *
+ * Exported for tests. The filter is the load-bearing part: a bucket with no
+ * trades in it comes back as zeroes, and the currently forming bucket is
+ * usually one of those. `Number.isFinite(0)` is true, so guarding on finiteness
+ * alone let it through — which dropped the line to zero at the right edge,
+ * dragged the y-axis domain down to 0 so the real price variation was squashed
+ * into a sliver, and painted the whole chart red because the closing price now
+ * sat below the opening one. A period with no trades has no price: it is
+ * absent, not zero.
+ */
+export function mapOhlcvRows(rows: number[][]): Candle[] {
   return rows
     .map(([time, open, high, low, close, volume]) => ({
       // The API reports seconds; the rest of the app works in milliseconds.
@@ -74,7 +88,12 @@ export async function fetchCandles(
       close,
       volume,
     }))
-    .filter((candle) => Number.isFinite(candle.close))
+    .filter(
+      (candle) =>
+        Number.isFinite(candle.time) &&
+        Number.isFinite(candle.close) &&
+        candle.close > 0,
+    )
     .sort((a, b) => a.time - b.time);
 }
 
@@ -136,6 +155,53 @@ export async function fetchTrades(
     })
     .filter((trade) => trade.valueUsd > 0)
     .sort((a, b) => b.timestamp - a.timestamp);
+}
+
+interface TokenInfoResponse {
+  data?: {
+    attributes?: {
+      holders?: {
+        count?: number | string | null;
+      } | null;
+    };
+  };
+}
+
+/**
+ * Holder count for a token.
+ *
+ * Returns null rather than a number whenever the provider does not report one.
+ * Coverage is genuinely patchy — it depends on the network and on how long
+ * GeckoTerminal has indexed the token — and a holder count is exactly the kind
+ * of figure someone would act on, so a guess here would be worse than a dash.
+ */
+export async function fetchHolderCount(
+  chain: ChainId,
+  tokenAddress: string,
+): Promise<number | null> {
+  if (!supportsChain(chain) || !tokenAddress) return null;
+
+  const url = `${BASE}/networks/${NETWORK[chain]}/tokens/${tokenAddress}/info`;
+  const response = await getJson<TokenInfoResponse>(url);
+
+  return readHolderCount(response);
+}
+
+/**
+ * Pull the holder count out of a token-info payload.
+ *
+ * Exported for tests. The field arrives as a number on some networks and a
+ * numeric string on others, and is null or absent wherever the provider has
+ * not indexed holders at all.
+ */
+export function readHolderCount(response: TokenInfoResponse): number | null {
+  const raw = response.data?.attributes?.holders?.count;
+  if (raw === null || raw === undefined) return null;
+
+  const count = typeof raw === 'string' ? Number.parseInt(raw, 10) : raw;
+  // Zero holders is not a real answer for a token that trades, so treat it the
+  // same as "not reported" rather than printing a confident 0.
+  return Number.isFinite(count) && count > 0 ? count : null;
 }
 
 /** Whether a chain is covered by this provider. */

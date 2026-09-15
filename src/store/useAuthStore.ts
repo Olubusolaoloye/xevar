@@ -18,8 +18,14 @@ interface AuthState {
    * database's answer is the one that governs what actually happens.
    */
   isAdmin: boolean;
+  /** The auth user id, used to scope a developer's own listings. */
+  userId: string | null;
 
   init: () => void;
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
   signInWithPassword: (
     email: string,
     password: string,
@@ -35,13 +41,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   email: null,
   ready: !hasBackend,
   isAdmin: false,
+  userId: null,
 
   init: () => {
     if (!supabase || unsubscribe) return;
 
-    const resolve = async (email: string | null) => {
+    const resolve = async (email: string | null, userId: string | null) => {
       if (!email) {
-        set({ email: null, isAdmin: false, ready: true });
+        set({ email: null, userId: null, isAdmin: false, ready: true });
         return;
       }
 
@@ -49,17 +56,44 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // the email string would be a client-side check that a modified bundle
       // could flip; the database function is authoritative.
       const { data, error } = await supabase.rpc(IS_ADMIN_RPC);
-      set({ email, isAdmin: error ? false : Boolean(data), ready: true });
+      set({ email, userId, isAdmin: error ? false : Boolean(data), ready: true });
     };
 
     void supabase.auth
       .getSession()
-      .then(({ data }) => resolve(data.session?.user.email ?? null));
+      .then(({ data }) =>
+        resolve(data.session?.user.email ?? null, data.session?.user.id ?? null),
+      );
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      void resolve(session?.user.email ?? null);
+      void resolve(session?.user.email ?? null, session?.user.id ?? null);
     });
     unsubscribe = () => listener.subscription.unsubscribe();
+  },
+
+  signUp: async (email, password) => {
+    if (!supabase) return { ok: false, error: 'No backend is configured.' };
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return { ok: false, error: `Use at least ${MIN_PASSWORD_LENGTH} characters.` };
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}developer`,
+      },
+    });
+
+    if (error) return { ok: false, error: error.message };
+
+    /* Supabase returns a user with no session when email confirmation is on.
+       It also returns a lookalike response for an address that already has an
+       account, which is deliberate on their side and worth preserving: telling
+       the caller "that email is taken" would turn this form into a way to
+       enumerate who has registered. Either way the honest instruction is the
+       same — go and check your inbox. */
+    return { ok: true, needsConfirmation: !data.session };
   },
 
   signInWithPassword: async (email, password) => {
@@ -126,7 +160,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signOut: async () => {
     await supabase?.auth.signOut();
-    set({ email: null, isAdmin: false });
+    set({ email: null, userId: null, isAdmin: false });
     void get();
   },
 }));

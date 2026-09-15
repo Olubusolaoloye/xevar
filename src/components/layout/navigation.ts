@@ -1,5 +1,7 @@
 import {
   Bell,
+  Megaphone,
+  Code2,
   Flame,
   LayoutGrid,
   LineChart,
@@ -52,6 +54,8 @@ export const SECTION_ITEMS: NavItem[] = [
   { label: 'Losers', path: '/sections/losers', icon: TrendingDown, hint: 'Steepest 24-hour falls' },
   { label: 'Trending', path: '/sections/trending', icon: Flame, hint: 'Most active over the last hour' },
   { label: 'Multi-chart', path: '/multichart', icon: LineChart, hint: 'Compare two tokens side by side' },
+  { label: 'Developers', path: '/developer', icon: Code2, hint: 'List your token' },
+  { label: 'Advertise', path: '/ads', icon: Megaphone, hint: 'Ad placements — coming soon', soon: true },
 ];
 
 /**
