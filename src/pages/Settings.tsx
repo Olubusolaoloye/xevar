@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Wordmark } from '@/components/brand/Logo';
 import { clearPersistedData } from '@/store/persistedKeys';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 const CURRENCY_OPTIONS = (Object.keys(CURRENCY_SYMBOL) as Currency[]).map((code) => ({
   value: code,
@@ -72,6 +73,11 @@ export function Settings() {
                   size="sm"
                 />
               }
+            />
+            <Row
+              label="Theme"
+              description="Match system follows your device, switching with it as the day goes on."
+              control={<ThemeToggle />}
             />
             <Row
               label="Table density"

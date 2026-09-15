@@ -547,12 +547,15 @@ export function Developer() {
       {!ready ? (
         <p className="mt-6 text-center text-sm text-ink-low">Checking your session…</p>
       ) : !email || !userId ? (
-        <>
-          <div className="mt-5">
-            <PaymentPanel />
-          </div>
-          <DeveloperAuth />
-        </>
+        /* Signed out: the sign-in form and nothing else.
+
+           The payment address and the listing terms used to sit above it, on
+           the reasoning that someone deciding whether to bother should be able
+           to read the price first. But a payment address on a page anyone can
+           load is a payment address that can be screenshotted out of context,
+           and the fee only means anything attached to a submission that an
+           account owns. Sign in, then see what to send and where. */
+        <DeveloperAuth />
       ) : (
         <div className="mt-5 space-y-4">
           <PaymentPanel />
