@@ -9,11 +9,13 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
+import { MobileDrawer } from './MobileDrawer';
 import { CommandPalette } from './CommandPalette';
 import { UpdateBanner } from './UpdateBanner';
 
 export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const { pathname } = useLocation();
 
   // One feed for the whole application, mounted at the shell.
@@ -80,7 +82,10 @@ export function AppShell() {
       <SideRail />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar onOpenSearch={() => setPaletteOpen(true)} />
+        <TopBar
+          onOpenSearch={() => setPaletteOpen(true)}
+          onOpenNav={() => setNavOpen(true)}
+        />
 
         {/* Bottom padding clears the mobile tab bar. */}
         <main className="flex-1 pb-20 lg:pb-0">
@@ -89,6 +94,7 @@ export function AppShell() {
       </div>
 
       <MobileNav />
+      <MobileDrawer open={navOpen} onClose={() => setNavOpen(false)} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <UpdateBanner />
     </div>
