@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { hasBackend, supabase, TABLES, type AdSlideRow, type AppSettingsRow } from '@/lib/supabase';
 import { parseCuratedTokens, type CuratedEntry } from '@/data/curatedList';
+import { DEFAULT_LOCK_MESSAGE, DEFAULT_LOCK_TITLE } from '@/data/appLock';
 
 /**
  * A slide in the hero carousel.
@@ -99,6 +100,11 @@ interface AdminState {
   /** Its members, by contract address. See data/curatedList.ts. */
   curatedTokens: CuratedEntry[];
 
+  /** True while the app is closed to everyone but the admin. */
+  locked: boolean;
+  lockTitle: string;
+  lockMessage: string;
+
   setPassHash: (hash: string | null) => void;
   addSlide: (slide: Omit<AdSlide, 'id' | 'order'>) => void;
   updateSlide: (id: string, patch: Partial<Omit<AdSlide, 'id'>>) => void;
@@ -107,6 +113,7 @@ interface AdminState {
   setProvider: (patch: Partial<VerdictProvider>) => void;
   setPollSeconds: (seconds: number) => void;
   setCuratedList: (patch: { name?: string; tokens?: CuratedEntry[] }) => void;
+  setLock: (patch: { locked?: boolean; title?: string; message?: string }) => void;
 }
 
 export const useAdminStore = create<AdminState>()(
@@ -121,6 +128,15 @@ export const useAdminStore = create<AdminState>()(
       // seeding addresses into the bundle would put them on the watchlist of
       // anyone who self-hosts this, with no way for them to have chosen it.
       curatedTokens: [],
+
+      /* Open by default, and deliberately not persisted to localStorage with
+         the rest of this store — a stale `true` cached in a browser would
+         show the closed sign to somebody long after the operator reopened
+         the app, with nothing they could do about it. The switch is read
+         from the backend every time. */
+      locked: false,
+      lockTitle: DEFAULT_LOCK_TITLE,
+      lockMessage: DEFAULT_LOCK_MESSAGE,
 
       setPassHash: (passHash) => set({ passHash }),
 
@@ -168,8 +184,25 @@ export const useAdminStore = create<AdminState>()(
           curatedName: name ?? state.curatedName,
           curatedTokens: tokens ?? state.curatedTokens,
         })),
+
+      setLock: ({ locked, title, message }) =>
+        set((state) => ({
+          locked: locked ?? state.locked,
+          lockTitle: title ?? state.lockTitle,
+          lockMessage: message ?? state.lockMessage,
+        })),
     }),
-    { name: 'panscreener.admin' },
+    {
+      name: 'panscreener.admin',
+      /* Everything except the lock. See the comment on `locked` above: a
+         cached `true` would outlive the operator reopening the app. */
+      partialize: ({ locked, lockTitle, lockMessage, ...rest }) => {
+        void locked;
+        void lockTitle;
+        void lockMessage;
+        return rest;
+      },
+    },
   ),
 );
 
@@ -252,6 +285,9 @@ export function startAdminSync() {
       // nothing extra rather than throwing on every page load.
       curatedName: row.curated_list_name || DEFAULT_CURATED_NAME,
       curatedTokens: parseCuratedTokens(row.curated_list_tokens),
+      locked: Boolean(row.app_locked),
+      lockTitle: row.lock_title || DEFAULT_LOCK_TITLE,
+      lockMessage: row.lock_message || DEFAULT_LOCK_MESSAGE,
     });
   };
 
@@ -330,6 +366,19 @@ export const adminBackend = {
     const row: Record<string, unknown> = {};
     if (patch.name !== undefined) row.curated_list_name = patch.name.trim() || DEFAULT_CURATED_NAME;
     if (patch.tokens !== undefined) row.curated_list_tokens = patch.tokens;
+    if (Object.keys(row).length === 0) return;
+    const { error } = await supabase.from(TABLES.appSettings).update(row).eq('id', 1);
+    return error ? { ok: false as const, error: error.message } : { ok: true as const };
+  },
+
+  async setLock(patch: { locked?: boolean; title?: string; message?: string }) {
+    if (!supabase) return useAdminStore.getState().setLock(patch);
+    const row: Record<string, unknown> = {};
+    if (patch.locked !== undefined) row.app_locked = patch.locked;
+    if (patch.title !== undefined) row.lock_title = patch.title.trim() || DEFAULT_LOCK_TITLE;
+    if (patch.message !== undefined) {
+      row.lock_message = patch.message.trim() || DEFAULT_LOCK_MESSAGE;
+    }
     if (Object.keys(row).length === 0) return;
     const { error } = await supabase.from(TABLES.appSettings).update(row).eq('id', 1);
     return error ? { ok: false as const, error: error.message } : { ok: true as const };
