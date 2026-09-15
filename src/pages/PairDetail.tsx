@@ -224,31 +224,27 @@ export function PairDetail() {
               {pair.baseToken.name} · created {formatAge(pair.createdAt)} ago
             </p>
 
-            {pair.blurb && (
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-mid">
-                {pair.blurb}
-              </p>
-            )}
+            {/* Real links.
 
-            {/* Shown, but deliberately not clickable.
-
-                A link out of a screener is the highest-trust thing on the
-                page: following one is how a visitor ends up approving a
-                contract. These destinations are supplied by whoever submitted
-                the listing, so until that submission has been paid for and
-                reviewed they are displayed as claims, not offered as
-                navigation. */}
+                Everything in `pair.socials` was submitted with a listing and
+                approved in review — the market provider's own social fields
+                are deliberately not merged in, so there is no mixture of
+                vetted and unvetted destinations to tell apart here. A token
+                whose listing carries no links simply shows none. */}
             {socials.length > 0 && (
               <div className="mt-2.5 flex items-center gap-1.5">
                 {socials.map((social) => (
-                  <span
+                  <a
                     key={social.label}
-                    aria-label={`${social.label} (link inactive)`}
-                    title="Links are inactive until the listing is reviewed"
-                    className="cursor-not-allowed rounded-sm border border-line bg-sunken p-1.5 text-ink-dim opacity-60"
+                    href={social.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={social.label}
+                    title={social.label}
+                    className="rounded-sm border border-line bg-sunken p-1.5 text-ink-low transition-colors hover:border-brand-500/40 hover:text-brand-500"
                   >
                     <social.icon className="h-3.5 w-3.5" />
-                  </span>
+                  </a>
                 ))}
               </div>
             )}
@@ -324,6 +320,22 @@ export function PairDetail() {
             />
             <TradeTape pair={pair} />
           </Panel>
+
+          {/* Contract verdict and the share card follow the trades, in the
+              wide column where both have room: the verdict is a block of
+              findings that reads badly at sidebar width, and the share card
+              renders a preview of a 1200x675 image. */}
+          <Panel className="overflow-hidden">
+            {pair.security.available ? (
+              <SecurityPanel security={pair.security} />
+            ) : (
+              <VerdictPanel pair={pair} />
+            )}
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ShareCards pair={pair} />
+          </Panel>
         </div>
 
         <div className="space-y-4">
@@ -340,6 +352,17 @@ export function PairDetail() {
           <Panel className="overflow-hidden">
             <PanelHeader title="Pair info" />
             <div className="divide-y divide-line-soft">
+              {/* The brief sits here rather than above the chart.
+
+                  In the header it pushed the price and the chart down the
+                  page on every token that had one, so the first thing a
+                  screener showed was prose. It is reference material — read
+                  once, if at all — which is what this panel is for. */}
+              {pair.blurb && (
+                <p className="px-4 py-3 text-[11px] leading-relaxed text-ink-mid">
+                  {pair.blurb}
+                </p>
+              )}
               <AddressRow
                 label={`${pair.baseToken.symbol} token`}
                 address={pair.baseToken.address}
@@ -403,18 +426,6 @@ export function PairDetail() {
 
           <Panel className="overflow-hidden">
             <ProfitCalculator pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            <ShareCards pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            {pair.security.available ? (
-              <SecurityPanel security={pair.security} />
-            ) : (
-              <VerdictPanel pair={pair} />
-            )}
           </Panel>
 
           <p className="px-1 text-[11px] leading-relaxed text-ink-dim">

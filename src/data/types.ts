@@ -109,6 +109,13 @@ export interface Pair {
 
   security: SecuritySignals;
 
+  /**
+   * Links submitted with the listing and approved in review.
+   *
+   * Never the market provider's own social fields. Everything here has been
+   * through a human, which is what lets the token page offer them as real
+   * links rather than as inert claims.
+   */
   socials: {
     website?: string;
     twitter?: string;

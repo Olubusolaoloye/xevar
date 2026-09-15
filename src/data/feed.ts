@@ -257,10 +257,21 @@ export class MarketFeed {
         coverUrl: shown.coverUrl ?? undefined,
         blurb: shown.blurb ?? undefined,
         featured: Boolean(token.featured),
+        /* Only links that came through the listing itself.
+
+           The provider's own social fields used to be a fallback here, which
+           made `socials` a mixture of two very different things: destinations
+           an admin approved, and destinations scraped from a third party for a
+           token nobody vetted. The page cannot offer one as a safe link and
+           not the other if it cannot tell them apart.
+
+           Dropping the fallback makes the invariant simple enough to rely on:
+           anything in `socials` was submitted with a listing and survived
+           review, so the page can link to it. A token with none shows none. */
         socials: {
-          website: shown.website ?? chosen.socials.website,
-          twitter: shown.twitter ?? chosen.socials.twitter,
-          telegram: shown.telegram ?? chosen.socials.telegram,
+          website: shown.website ?? undefined,
+          twitter: shown.twitter ?? undefined,
+          telegram: shown.telegram ?? undefined,
         },
         tracked: {
           tokenId: token.id,
