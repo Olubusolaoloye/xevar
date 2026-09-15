@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cached } from '@/data/cache';
-import {
-  fetchCandles,
-  fetchHolderCount,
-  fetchTrades,
-  type CandleInterval,
-} from '@/data/sources/geckoterminal';
+import { fetchCandles, fetchTrades, type CandleInterval } from '@/data/sources/geckoterminal';
 import type { Candle, Pair, Trade } from '@/data/types';
 
 interface AsyncResult<T> {
@@ -112,50 +107,4 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
   }, [pairId, chain, pairAddress, refreshMs]);
 
   return state;
-}
-
-/**
- * Holder count for a pair's base token.
- *
- * Cached for a long while on purpose: holder counts move slowly, and
- * GeckoTerminal's 30-requests-a-minute budget is better spent on candles and
- * trades. Resolves to null wherever the provider has no answer, which the UI
- * renders as a dash rather than a zero.
- */
-export function useTokenHolders(pair: Pair | undefined) {
-  const [holders, setHolders] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const { chain, baseToken } = pair ?? {};
-  const tokenAddress = baseToken?.address;
-
-  useEffect(() => {
-    if (!chain || !tokenAddress) return;
-    let cancelled = false;
-    setLoading(true);
-
-    cached(
-      `holders:${chain}:${tokenAddress}`,
-      () => fetchHolderCount(chain, tokenAddress),
-      { freshMs: 10 * 60_000, maxStaleMs: 60 * 60_000 },
-    )
-      .then(({ value }) => {
-        if (!cancelled) {
-          setHolders(value);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHolders(null);
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chain, tokenAddress]);
-
-  return { holders, loading };
 }

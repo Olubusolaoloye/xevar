@@ -5,7 +5,9 @@ import { formatAge, formatCompact } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketStore } from '@/store/useMarketStore';
 import {
+  ALERT_METRIC_LABEL as METRIC_LABEL,
   conditionMet,
+  metricFormat,
   readMetric,
   useAlertStore,
 } from '@/store/useAlertStore';
@@ -20,18 +22,36 @@ import { ChainChip } from '@/components/ui/ChainChip';
 import { PageHeader } from '@/components/layout/PageHeader';
 import type { Alert, AlertComparator, AlertMetric, Pair } from '@/data/types';
 
-const METRIC_LABEL: Record<AlertMetric, string> = {
-  price: 'Price',
-  change24h: '24h change',
-  liquidity: 'Liquidity',
-  volume24h: '24h volume',
-};
+/**
+ * Write a metric's value the way that metric is read.
+ *
+ * One function rather than a ternary at each call site: the list row, the
+ * activity log and the alert description all print these numbers, and before
+ * this they each re-derived the rule — which is how a new metric gets added in
+ * one of them and formatted as raw dollars in the other two.
+ */
+function formatMetric(
+  metric: AlertMetric,
+  value: number,
+  priceText: (usd: number) => string,
+  money: (usd: number) => string,
+): string {
+  switch (metricFormat(metric)) {
+    case 'percent':
+      return `${value}%`;
+    case 'price':
+      return priceText(value);
+    case 'money':
+      return money(value);
+  }
+}
 
-function describe(alert: Alert, format: (usd: number) => string): string {
-  const threshold =
-    alert.metric === 'change24h'
-      ? `${alert.threshold}%`
-      : format(alert.threshold);
+function describe(
+  alert: Alert,
+  priceText: (usd: number) => string,
+  money: (usd: number) => string,
+): string {
+  const threshold = formatMetric(alert.metric, alert.threshold, priceText, money);
   return `${METRIC_LABEL[alert.metric]} goes ${alert.comparator} ${threshold}`;
 }
 
@@ -166,9 +186,17 @@ function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => voi
             onChange={(event) => setThreshold(event.target.value)}
             onKeyDown={(event) => event.key === 'Enter' && submit()}
             inputMode="decimal"
-            placeholder={metric === 'change24h' ? '10' : '3000'}
+            placeholder={
+              metricFormat(metric) === 'percent'
+                ? '10'
+                : metric === 'marketCap'
+                  ? '120000'
+                  : '3000'
+            }
             suffix={
-              <span className="text-xs">{metric === 'change24h' ? '%' : 'USD'}</span>
+              <span className="text-xs">
+                {metricFormat(metric) === 'percent' ? '%' : 'USD'}
+              </span>
             }
           />
         </div>
@@ -320,15 +348,13 @@ export function Alerts() {
                       </div>
 
                       <p className="truncate text-[11px] text-ink-low">
-                        {describe(alert, alert.metric === 'price' ? priceText : money)}
+                        {describe(alert, priceText, money)}
                         {current !== null && (
                           <span className="text-ink-dim">
                             {' · now '}
-                            {alert.metric === 'change24h'
+                            {metricFormat(alert.metric) === 'percent'
                               ? `${current.toFixed(1)}%`
-                              : alert.metric === 'price'
-                                ? priceText(current)
-                                : formatCompact(current, '$')}
+                              : formatMetric(alert.metric, current, priceText, money)}
                           </span>
                         )}
                       </p>
@@ -387,19 +413,13 @@ export function Alerts() {
                   <span className="text-ink-low">
                     {' — '}
                     {METRIC_LABEL[event.metric].toLowerCase()} went {event.comparator}{' '}
-                    {event.metric === 'change24h'
-                      ? `${event.threshold}%`
-                      : event.metric === 'price'
-                        ? priceText(event.threshold)
-                        : formatCompact(event.threshold, '$')}
+                    {formatMetric(event.metric, event.threshold, priceText, money)}
                   </span>
                   <span className="text-ink-dim">
                     {' at '}
-                    {event.metric === 'change24h'
+                    {metricFormat(event.metric) === 'percent'
                       ? `${event.value.toFixed(1)}%`
-                      : event.metric === 'price'
-                        ? priceText(event.value)
-                        : formatCompact(event.value, '$')}
+                      : formatMetric(event.metric, event.value, priceText, money)}
                   </span>
                 </p>
                 <span className="shrink-0 text-[11px] tabular-nums text-ink-dim">

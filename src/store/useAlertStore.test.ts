@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { conditionMet, readMetric, useAlertStore } from './useAlertStore';
+import {
+  ALERT_METRIC_LABEL,
+  conditionMet,
+  metricFormat,
+  readMetric,
+  useAlertStore,
+} from './useAlertStore';
 import type { Alert, Pair } from '@/data/types';
 
 /** A pair with only the fields the evaluator reads; the rest is scaffolding. */
@@ -58,9 +64,11 @@ describe('readMetric', () => {
       change: { m5: 0, h1: 0, h6: 0, h24: -12.5 },
       liquidityUsd: 900,
       volume: { m5: 0, h1: 0, h6: 0, h24: 4200 },
+      marketCap: 4_200_000,
     });
 
     expect(readMetric(p, 'price')).toBe(3);
+    expect(readMetric(p, 'marketCap')).toBe(4_200_000);
     expect(readMetric(p, 'change24h')).toBe(-12.5);
     expect(readMetric(p, 'liquidity')).toBe(900);
     expect(readMetric(p, 'volume24h')).toBe(4200);
@@ -169,5 +177,67 @@ describe('evaluate', () => {
     useAlertStore.getState().removeAlert(alert.id);
     expect(useAlertStore.getState().alerts).toHaveLength(0);
     expect(useAlertStore.getState().events).toHaveLength(0);
+  });
+});
+
+describe('market cap alerts', () => {
+  it('fires when market cap crosses the threshold', () => {
+    // The case asked for: "alert me when market cap hits 120,000".
+    addAlert({ metric: 'marketCap', comparator: 'above', threshold: 120_000 });
+    const { evaluate } = useAlertStore.getState();
+
+    evaluate([pair({ id: 'p1', marketCap: 90_000 })]);
+    expect(useAlertStore.getState().events).toHaveLength(0);
+
+    evaluate([pair({ id: 'p1', marketCap: 121_500 })]);
+    const [event] = useAlertStore.getState().events;
+    expect(event.metric).toBe('marketCap');
+    expect(event.value).toBe(121_500);
+    expect(event.threshold).toBe(120_000);
+  });
+
+  it('fires on a fall through the threshold', () => {
+    addAlert({ metric: 'marketCap', comparator: 'below', threshold: 5_000_000 });
+    const { evaluate } = useAlertStore.getState();
+
+    evaluate([pair({ id: 'p1', marketCap: 6_000_000 })]);
+    evaluate([pair({ id: 'p1', marketCap: 4_800_000 })]);
+    expect(useAlertStore.getState().events).toHaveLength(1);
+  });
+
+  it('is edge-triggered like every other metric', () => {
+    addAlert({ metric: 'marketCap', comparator: 'above', threshold: 120_000 });
+    const { evaluate } = useAlertStore.getState();
+
+    evaluate([pair({ id: 'p1', marketCap: 100_000 })]);
+    evaluate([pair({ id: 'p1', marketCap: 130_000 })]);
+    evaluate([pair({ id: 'p1', marketCap: 140_000 })]);
+    evaluate([pair({ id: 'p1', marketCap: 150_000 })]);
+    expect(useAlertStore.getState().events).toHaveLength(1);
+  });
+
+  it('skips a pair with no market cap rather than firing at zero', () => {
+    // DexScreener reports 0 when it has neither market cap nor FDV. A "below"
+    // alert would otherwise fire instantly for every such token.
+    addAlert({ metric: 'marketCap', comparator: 'below', threshold: 5_000_000 });
+    useAlertStore.getState().evaluate([pair({ id: 'p1', marketCap: 0 })]);
+    expect(useAlertStore.getState().events).toHaveLength(0);
+  });
+});
+
+describe('metric presentation', () => {
+  it('labels every metric', () => {
+    for (const metric of ['price', 'marketCap', 'change24h', 'liquidity', 'volume24h'] as const) {
+      expect(ALERT_METRIC_LABEL[metric]).toBeTruthy();
+    }
+    expect(ALERT_METRIC_LABEL.marketCap).toBe('Market cap');
+  });
+
+  it('formats market cap as money, not as a percentage or a raw price', () => {
+    expect(metricFormat('marketCap')).toBe('money');
+    expect(metricFormat('change24h')).toBe('percent');
+    expect(metricFormat('price')).toBe('price');
+    expect(metricFormat('liquidity')).toBe('money');
+    expect(metricFormat('volume24h')).toBe('money');
   });
 });

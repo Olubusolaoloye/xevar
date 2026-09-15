@@ -23,11 +23,21 @@ export interface AlertEvent {
 /** Oldest events past this count are dropped — this is a log, not an archive. */
 const MAX_EVENTS = 50;
 
+export const ALERT_METRIC_LABEL: Record<AlertMetric, string> = {
+  price: 'Price',
+  marketCap: 'Market cap',
+  change24h: '24h change',
+  liquidity: 'Liquidity',
+  volume24h: '24h volume',
+};
+
 /** Read the value an alert watches off a pair. */
 export function readMetric(pair: Pair, metric: AlertMetric): number {
   switch (metric) {
     case 'price':
       return pair.priceUsd;
+    case 'marketCap':
+      return pair.marketCap;
     case 'change24h':
       return pair.change.h24;
     case 'liquidity':
@@ -35,6 +45,35 @@ export function readMetric(pair: Pair, metric: AlertMetric): number {
     case 'volume24h':
       return pair.volume.h24;
   }
+}
+
+/**
+ * How a threshold for this metric should be written.
+ *
+ * `percent` is the odd one out — every other metric is an amount of money.
+ * Price gets its own treatment because a memecoin trades at 0.00000004 and a
+ * compact "$0.0" would round the whole thing away.
+ */
+export function metricFormat(metric: AlertMetric): 'percent' | 'price' | 'money' {
+  if (metric === 'change24h') return 'percent';
+  if (metric === 'price') return 'price';
+  return 'money';
+}
+
+/**
+ * Whether the provider actually reported this metric.
+ *
+ * Only price and market cap treat zero as absent, and the distinction is the
+ * point. DexScreener sends 0 when it has neither a market cap nor an FDV, so a
+ * "market cap below 5,000,000" alert would fire the instant it saw any token
+ * it has no figure for. Liquidity, volume and 24h change are different: zero
+ * liquidity is a drained pool and zero volume is a day with no trades, and an
+ * alert watching for either is watching for exactly that.
+ */
+export function metricIsReported(metric: AlertMetric, value: number): boolean {
+  if (!Number.isFinite(value)) return false;
+  if (metric === 'price' || metric === 'marketCap') return value > 0;
+  return true;
 }
 
 /** Whether a value satisfies an alert's condition right now. */
@@ -149,7 +188,10 @@ export const useAlertStore = create<AlertState>()(
           }
 
           const value = readMetric(pair, alert.metric);
-          if (!Number.isFinite(value)) continue;
+          // An unreported metric is unknown, not zero. Leave the previous
+          // state alone rather than treating it as a reading, for the same
+          // reason a pair that drops off the board does not re-arm.
+          if (!metricIsReported(alert.metric, value)) continue;
 
           const now = conditionMet(alert, value);
           const before = met[alert.id] ?? false;

@@ -157,52 +157,17 @@ export async function fetchTrades(
     .sort((a, b) => b.timestamp - a.timestamp);
 }
 
-interface TokenInfoResponse {
-  data?: {
-    attributes?: {
-      holders?: {
-        count?: number | string | null;
-      } | null;
-    };
-  };
-}
+/* A holder count used to be fetched here, from this provider's
+   /tokens/{address}/info endpoint.
 
-/**
- * Holder count for a token.
- *
- * Returns null rather than a number whenever the provider does not report one.
- * Coverage is genuinely patchy — it depends on the network and on how long
- * GeckoTerminal has indexed the token — and a holder count is exactly the kind
- * of figure someone would act on, so a guess here would be worse than a dash.
- */
-export async function fetchHolderCount(
-  chain: ChainId,
-  tokenAddress: string,
-): Promise<number | null> {
-  if (!supportsChain(chain) || !tokenAddress) return null;
+   It was removed because the figure did not match the chain. Whether the field
+   is stale or means something other than "wallets holding this token" could
+   not be established, and a holder count is read as a distribution check by
+   someone deciding whether to buy — so a wrong one is worse than none. The
+   pair page links to the chain explorer's own token page instead.
 
-  const url = `${BASE}/networks/${NETWORK[chain]}/tokens/${tokenAddress}/info`;
-  const response = await getJson<TokenInfoResponse>(url);
-
-  return readHolderCount(response);
-}
-
-/**
- * Pull the holder count out of a token-info payload.
- *
- * Exported for tests. The field arrives as a number on some networks and a
- * numeric string on others, and is null or absent wherever the provider has
- * not indexed holders at all.
- */
-export function readHolderCount(response: TokenInfoResponse): number | null {
-  const raw = response.data?.attributes?.holders?.count;
-  if (raw === null || raw === undefined) return null;
-
-  const count = typeof raw === 'string' ? Number.parseInt(raw, 10) : raw;
-  // Zero holders is not a real answer for a token that trades, so treat it the
-  // same as "not reported" rather than printing a confident 0.
-  return Number.isFinite(count) && count > 0 ? count : null;
-}
+   Re-adding this needs a provider whose number can actually be checked against
+   an explorer, which in practice means a keyed API. */
 
 /** Whether a chain is covered by this provider. */
 export function supportsChain(chain: ChainId): boolean {

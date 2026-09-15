@@ -168,7 +168,12 @@ export interface Candle {
 /* Alerts                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export type AlertMetric = 'price' | 'change24h' | 'liquidity' | 'volume24h';
+export type AlertMetric =
+  | 'price'
+  | 'marketCap'
+  | 'change24h'
+  | 'liquidity'
+  | 'volume24h';
 export type AlertComparator = 'above' | 'below';
 
 export interface Alert {

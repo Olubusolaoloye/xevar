@@ -20,7 +20,6 @@ import { CHAINS } from '@/data/chains';
 import { TIMEFRAMES, TIMEFRAME_LABEL } from '@/data/types';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketStore } from '@/store/useMarketStore';
-import { useTokenHolders } from '@/hooks/usePairChart';
 import { useScreenerStore } from '@/store/useScreenerStore';
 import { Button } from '@/components/ui/Button';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
@@ -137,10 +136,6 @@ export function PairDetail() {
   const watched = useScreenerStore((s) => (pairId ? s.watchlist.includes(pairId) : false));
   const toggleWatch = useScreenerStore((s) => s.toggleWatch);
   const { compact: money, priceText } = useCurrency();
-  // Must sit above the early return below: a hook called conditionally throws
-  // "rendered more hooks than during the previous render" the moment a pair
-  // resolves. The hook no-ops while `pair` is undefined.
-  const { holders, loading: holdersLoading } = useTokenHolders(pair);
 
   if (!pair) {
     return (
@@ -355,19 +350,30 @@ export function PairDetail() {
                 address={pair.pairAddress}
                 explorer={chain.explorer}
               />
-              <div className="flex items-center justify-between px-4 py-2.5">
+              {/* Holders links out rather than printing a number.
+
+                  A count was shown here and it did not match the chain. There
+                  is no free, keyless provider whose holder figure can be
+                  trusted — the one available reports a value that is stale or
+                  means something other than "wallets holding this token", and
+                  a holder count is exactly the figure someone reads as a
+                  distribution check before buying. Being confidently wrong
+                  about it is worse than not answering.
+
+                  The explorer's own token page is the answer, so it is what
+                  this points at. */}
+              <a
+                href={`${chain.explorer}/token/${pair.baseToken.address}#balances`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-raised"
+              >
                 <span className="text-[11px] text-ink-low">Holders</span>
-                <span className="tnum font-mono text-[11px] text-ink-mid">
-                  {/* Null means the provider does not index holders for this
-                      token, which is common on newer pairs. A dash says so;
-                      a zero would read as a fact. */}
-                  {holdersLoading
-                    ? '…'
-                    : holders === null
-                      ? '—'
-                      : formatCount(holders)}
+                <span className="flex items-center gap-1 text-[11px] text-ink-mid">
+                  View on {chain.name} explorer
+                  <ExternalLink className="h-3 w-3 text-ink-dim" />
                 </span>
-              </div>
+              </a>
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-[11px] text-ink-low">Makers (24h)</span>
                 <span className="tnum font-mono text-[11px] text-ink-mid">
