@@ -34,7 +34,7 @@ export function AuthForm({
   intro,
   className,
 }: AuthFormProps) {
-  const { signUp, signInWithPassword } = useAuthStore();
+  const { signUp, signInWithPassword, resendConfirmation } = useAuthStore();
 
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [email, setEmail] = useState('');
@@ -42,6 +42,7 @@ export function AuthForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [resent, setResent] = useState(false);
 
   const ready = email.trim().length > 3 && password.length > 0 && !busy;
 
@@ -66,12 +67,58 @@ export function AuthForm({
   if (sent) {
     return (
       <Panel elevation="lifted" className={className}>
-        <div className="space-y-2 p-6 text-center">
+        <div className="space-y-3 p-6 text-center">
           <p className="font-display text-sm font-semibold text-ink">Check your inbox</p>
           <p className="text-xs leading-relaxed text-ink-low">
             If that address can be registered, a confirmation link is on its
             way. Open it and you will land back here, signed in.
           </p>
+
+          {/* A way out, because this screen used to be one.
+
+              The confirmation mail can genuinely fail to arrive — a project
+              on the default mail service is rate-limited to a handful an hour
+              and the rest are dropped — and the previous version of this
+              screen left somebody staring at "check your inbox" with nothing
+              to press. */}
+          <div className="flex flex-col gap-2 border-t border-line pt-3">
+            <Button
+              size="sm"
+              variant={resent ? 'primary' : 'outline'}
+              disabled={busy || resent}
+              onClick={() => {
+                setBusy(true);
+                void resendConfirmation(email).then((result) => {
+                  setBusy(false);
+                  if (result.ok) {
+                    setResent(true);
+                  } else {
+                    setError(result.error ?? 'Could not send it again.');
+                  }
+                });
+              }}
+            >
+              {resent ? 'Sent again' : busy ? 'Sending…' : 'Send it again'}
+            </Button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSent(false);
+                setResent(false);
+                setError(null);
+              }}
+              className="text-[11px] text-ink-low underline underline-offset-2 hover:text-ink"
+            >
+              Use a different address
+            </button>
+          </div>
+
+          {error && (
+            <p className="rounded-sm border border-down/25 bg-down/10 px-3 py-2 text-xs text-down">
+              {error}
+            </p>
+          )}
         </div>
       </Panel>
     );
@@ -163,6 +210,18 @@ export function AuthForm({
         >
           {busy ? 'Working…' : mode === 'up' ? signUpLabel : 'Sign in'}
         </Button>
+
+        {/* Shown to everyone on the sign-in tab, never in response to a
+            particular address. The error above says only "wrong email or
+            password" on purpose — naming "this account is not confirmed"
+            would answer whether an account exists — so this line carries the
+            one explanation that message cannot. */}
+        {mode === 'in' && (
+          <p className="text-center text-[11px] leading-relaxed text-ink-dim">
+            Just signed up and cannot get in? Your address may still need
+            confirming — check your inbox, including spam.
+          </p>
+        )}
       </div>
     </Panel>
   );

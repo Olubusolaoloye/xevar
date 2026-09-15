@@ -5,6 +5,7 @@ import { useThemeEffect } from '@/hooks/useTheme';
 import { startListingSync, stopListingSync } from '@/store/useListingStore';
 import { startAdminSync, stopAdminSync } from '@/store/useAdminStore';
 import { stopReviewSync } from '@/store/useReviewStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { SideRail } from './SideRail';
 import { TopBar } from './TopBar';
 import { MobileNav } from './MobileNav';
@@ -22,7 +23,17 @@ export function AppShell() {
   // Listings, adverts and settings come from the backend and stay in sync over
   // a websocket, so an admin edit on one device reaches every open browser
   // without anyone reloading.
+  //
+  // Auth starts here too, and that is a fix rather than tidying. init() sets
+  // up the listener that tells the store a session exists, and it used to be
+  // called only by the admin and developer screens — the two places that
+  // happened to need it first. So signing in anywhere else, such as the
+  // community panel on the compare page, authenticated the Supabase client
+  // but never told the store: the form stayed on screen and nothing happened
+  // until you reloaded or wandered onto the developer page. A session is
+  // application state, so it is established where the application starts.
   useEffect(() => {
+    useAuthStore.getState().init();
     startListingSync();
     startAdminSync();
     return () => {

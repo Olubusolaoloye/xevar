@@ -25,7 +25,14 @@ interface AuthState {
   signUp: (
     email: string,
     password: string,
+    /** Where the confirmation link should land. Defaults to the current page. */
+    returnTo?: string,
   ) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
+  /** Send the confirmation email again, for one that never arrived. */
+  resendConfirmation: (
+    email: string,
+    returnTo?: string,
+  ) => Promise<{ ok: boolean; error?: string }>;
   signInWithPassword: (
     email: string,
     password: string,
@@ -71,7 +78,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     unsubscribe = () => listener.subscription.unsubscribe();
   },
 
-  signUp: async (email, password) => {
+  signUp: async (email, password, returnTo) => {
     if (!supabase) return { ok: false, error: 'No backend is configured.' };
     if (password.length < MIN_PASSWORD_LENGTH) {
       return { ok: false, error: `Use at least ${MIN_PASSWORD_LENGTH} characters.` };
@@ -80,9 +87,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: {
-        emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}developer`,
-      },
+      /* Back to wherever they were, not to a fixed page. This form used to
+         live only on the developer screen and hardcoded a redirect there;
+         it is now also on the compare page, where confirming a signup would
+         have dumped a reviewer onto the listing-submission screen. */
+      options: { emailRedirectTo: returnTo ?? window.location.href },
     });
 
     if (error) return { ok: false, error: error.message };
@@ -94,6 +103,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
        enumerate who has registered. Either way the honest instruction is the
        same — go and check your inbox. */
     return { ok: true, needsConfirmation: !data.session };
+  },
+
+  resendConfirmation: async (email, returnTo) => {
+    if (!supabase) return { ok: false, error: 'No backend is configured.' };
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: returnTo ?? window.location.href },
+    });
+
+    /* Reported as sent either way. The error distinguishes "no such pending
+       signup" from "sent", and surfacing that would answer "does this address
+       have an account?" for anyone who asks — the same enumeration hole the
+       sign-in message is written to avoid. The rate-limit case is the one
+       exception worth passing on, because waiting is actionable and it says
+       nothing about whether the account exists. */
+    if (error && /rate|limit|seconds/i.test(error.message)) {
+      return { ok: false, error: 'Too many attempts. Wait a minute and try again.' };
+    }
+    return { ok: true };
   },
 
   signInWithPassword: async (email, password) => {
