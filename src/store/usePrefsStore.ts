@@ -31,10 +31,20 @@ interface PrefsState {
   railCollapsed: boolean;
   /** Suppress the live tick flash animation on table rows. */
   reduceFlash: boolean;
+  /**
+   * Whether this device has dismissed the curated watchlist.
+   *
+   * Per-device on purpose. The list is meant to greet a first-time visitor,
+   * and most of them have no account — tying dismissal to one would mean
+   * either showing it forever to signed-out users or asking them to register
+   * to make something go away. It is restorable from Settings.
+   */
+  curatedDismissed: boolean;
   setTheme: (theme: ThemeChoice) => void;
   setCurrency: (currency: Currency) => void;
   toggleRail: () => void;
   setReduceFlash: (value: boolean) => void;
+  setCuratedDismissed: (value: boolean) => void;
 }
 
 export const usePrefsStore = create<PrefsState>()(
@@ -44,10 +54,12 @@ export const usePrefsStore = create<PrefsState>()(
       currency: 'USD',
       railCollapsed: false,
       reduceFlash: false,
+      curatedDismissed: false,
       setTheme: (theme) => set({ theme }),
       setCurrency: (currency) => set({ currency }),
       toggleRail: () => set((state) => ({ railCollapsed: !state.railCollapsed })),
       setReduceFlash: (reduceFlash) => set({ reduceFlash }),
+      setCuratedDismissed: (curatedDismissed) => set({ curatedDismissed }),
     }),
     { name: 'panscreener.prefs' },
   ),

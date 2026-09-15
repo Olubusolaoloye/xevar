@@ -4,23 +4,70 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
-    <title>PanScreener — Live multi-chain DEX screener</title>
+    <!-- ========================================================================
+         Index metadata.
+
+         This is the only description of PanScreener that a search engine, a
+         Telegram unfurl or an X card ever sees — none of them run the app — so
+         it says what the product actually does rather than naming a category.
+         ===================================================================== -->
+
+    <title>PanScreener — live token prices, liquidity and order flow across 8 chains</title>
+
     <meta
       name="description"
-      content="PanScreener streams live DEX markets across eight networks into a single board: price, liquidity, order flow and risk signals, side by side."
+      content="PanScreener tracks listed tokens across Ethereum, BNB Chain, Solana, Base, Arbitrum, Polygon, Avalanche and Sui. Live price, liquidity, 24h volume, buy and sell pressure, holders and contract verdicts on one board — plus threshold alerts and a profit calculator. Market data comes from live on-chain pools; nothing is simulated."
     />
-    <meta name="theme-color" content="#07080a" />
-    <meta name="color-scheme" content="dark" />
+    <meta
+      name="keywords"
+      content="token tracker, live token price, liquidity, order flow, market cap alerts, multi-chain, Ethereum, BNB Chain, Solana, Base, Arbitrum, Polygon, Avalanche, Sui, token listing"
+    />
+    <meta name="author" content="PanScreener" />
+    <link rel="canonical" href="https://coinpan.netlify.app/" />
 
-    <!-- Open Graph -->
+    <!-- Both themes are supported; the app stamps its own choice on <html>.
+         Declaring only "dark" made the browser paint a dark ground behind a
+         light page for the split second before the bundle ran. -->
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0e0c0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#faf8f4" media="(prefers-color-scheme: light)" />
+
+    <!-- Open Graph — what Telegram, Discord, Slack and Facebook render. -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="PanScreener — Live multi-chain DEX screener" />
+    <meta property="og:site_name" content="PanScreener" />
+    <meta property="og:url" content="https://coinpan.netlify.app/" />
+    <meta
+      property="og:title"
+      content="PanScreener — live token prices, liquidity and order flow across 8 chains"
+    />
     <meta
       property="og:description"
-      content="Every pair. Every chain. One board."
+      content="Every pair. Every chain. One board. Live price, liquidity, volume and buy-sell pressure for listed tokens, with alerts on price or market cap and a shareable P&amp;L card."
     />
+    <meta property="og:image" content="/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="PanScreener — every pair, every chain, one board" />
 
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- X / Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="PanScreener — live token prices, liquidity and order flow across 8 chains"
+    />
+    <meta
+      name="twitter:description"
+      content="Every pair. Every chain. One board. Live market data from on-chain pools, threshold alerts, and a shareable P&amp;L card."
+    />
+    <meta name="twitter:image" content="/og-card.png" />
+
+    <!-- Icons, all cut from public/panlogo.png. The favicon sizes and the
+         in-app mark use the glass head only: the full magnifier's handle is
+         most of the box at 16px and leaves nothing legible. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
 
     <!-- Typography: display, interface and tabular mono. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />

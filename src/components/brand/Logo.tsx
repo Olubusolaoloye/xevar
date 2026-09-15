@@ -1,58 +1,31 @@
-import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
  * The PanScreener mark.
  *
- * A scanning aperture over a rising series, reading simultaneously as a
- * viewfinder (the "screening") and as a chart (the subject). The crimson frame
- * around a golden field mirrors the construction of the Blin brand artwork.
- * It resolves cleanly at 16px, which is the only size test a mark has to pass.
+ * The glass head of the magnifier, cropped from the full artwork in
+ * public/panlogo.png. The handle is dropped on purpose: at the sizes this
+ * renders — 22px in the top bar, 34px in the rail — a long diagonal handle
+ * costs most of the box and leaves the bars, which are the recognisable part,
+ * a few pixels tall.
+ *
+ * Served at 128px so it stays sharp on a 3x display, and as PNG rather than
+ * the source file because panlogo.png is 1.2MB and this is on every page.
  */
 export function LogoMark({ className, size = 28 }: { className?: string; size?: number }) {
-  const gradientId = useId();
-
   return (
-    <svg
+    <img
+      src={`${import.meta.env.BASE_URL}panlogo-mark.png`}
       width={size}
       height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      className={cn('shrink-0', className)}
-      role="img"
-      aria-label="PanScreener"
-    >
-      <defs>
-        <linearGradient id={gradientId} x1="4" y1="28" x2="28" y2="4" gradientUnits="userSpaceOnUse">
-          <stop stopColor="var(--color-brand-600)" />
-          <stop offset="1" stopColor="var(--color-brand-300)" />
-        </linearGradient>
-      </defs>
-
-      {/* Aperture body */}
-      <rect
-        x="1.25"
-        y="1.25"
-        width="29.5"
-        height="29.5"
-        rx="8.75"
-        stroke="var(--color-accent-500)"
-        strokeWidth="2.5"
-        opacity="0.85"
-      />
-
-      {/* Ascending series */}
-      <rect x="8" y="18" width="3.5" height="7" rx="1.75" fill="var(--color-brand-600)" />
-      <rect x="14.25" y="13" width="3.5" height="12" rx="1.75" fill="var(--color-brand-500)" />
-      <rect
-        x="20.5"
-        y="7"
-        width="3.5"
-        height="18"
-        rx="1.75"
-        style={{ fill: `url(#${gradientId})` }}
-      />
-    </svg>
+      alt=""
+      // The wordmark beside it already names the product; an alt here would
+      // have a screen reader announce it twice.
+      aria-hidden="true"
+      decoding="async"
+      className={cn('shrink-0 select-none', className)}
+      style={{ width: size, height: size }}
+    />
   );
 }
 

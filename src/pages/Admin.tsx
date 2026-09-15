@@ -7,6 +7,7 @@ import { FeedDiagnostics } from '@/components/admin/FeedDiagnostics';
 import { AdminGate } from '@/components/admin/AdminGate';
 import { SlideManager } from '@/components/admin/SlideManager';
 import { AdminSettings } from '@/components/admin/AdminSettings';
+import { CuratedListPanel } from '@/components/admin/CuratedListPanel';
 
 /**
  * The admin screen.
@@ -47,6 +48,10 @@ function AdminScreen() {
 
           <Panel className="overflow-hidden">
             <ListingList />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <CuratedListPanel />
           </Panel>
 
           <Panel className="overflow-hidden">

@@ -4,9 +4,8 @@
 
 **Every pair. Every chain. One board.**
 
-A live multi-chain DEX screener — pair-level price, liquidity, order flow and
-automated risk signals across eight networks, with threshold alerts and
-shareable P&L cards.
+Live token prices, liquidity, order flow and automated risk signals across
+eight networks — on one board, with threshold alerts and shareable P&L cards.
 
 </div>
 

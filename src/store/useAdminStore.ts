@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { hasBackend, supabase, TABLES, type AdSlideRow, type AppSettingsRow } from '@/lib/supabase';
+import { parseCuratedTokens, type CuratedEntry } from '@/data/curatedList';
 
 /**
  * A slide in the hero carousel.
@@ -66,6 +67,9 @@ const DEFAULT_PROVIDER: VerdictProvider = {
   enabled: true,
 };
 
+/** The list's title until an admin renames it. */
+export const DEFAULT_CURATED_NAME = 'SMC DAO';
+
 const DEFAULT_SLIDES: AdSlide[] = [
   {
     id: 'slide-default',
@@ -90,6 +94,10 @@ interface AdminState {
   provider: VerdictProvider;
   /** How often the board refreshes, in seconds. */
   pollSeconds: number;
+  /** Title of the curated watchlist every visitor sees once. */
+  curatedName: string;
+  /** Its members, by contract address. See data/curatedList.ts. */
+  curatedTokens: CuratedEntry[];
 
   setPassHash: (hash: string | null) => void;
   addSlide: (slide: Omit<AdSlide, 'id' | 'order'>) => void;
@@ -98,6 +106,7 @@ interface AdminState {
   moveSlide: (id: string, direction: -1 | 1) => void;
   setProvider: (patch: Partial<VerdictProvider>) => void;
   setPollSeconds: (seconds: number) => void;
+  setCuratedList: (patch: { name?: string; tokens?: CuratedEntry[] }) => void;
 }
 
 export const useAdminStore = create<AdminState>()(
@@ -107,6 +116,11 @@ export const useAdminStore = create<AdminState>()(
       slides: DEFAULT_SLIDES,
       provider: DEFAULT_PROVIDER,
       pollSeconds: 15,
+      curatedName: DEFAULT_CURATED_NAME,
+      // Empty without a backend. The roster is operator data, not a default:
+      // seeding addresses into the bundle would put them on the watchlist of
+      // anyone who self-hosts this, with no way for them to have chosen it.
+      curatedTokens: [],
 
       setPassHash: (passHash) => set({ passHash }),
 
@@ -148,6 +162,12 @@ export const useAdminStore = create<AdminState>()(
       // board stops feeling live.
       setPollSeconds: (seconds) =>
         set({ pollSeconds: Math.min(120, Math.max(10, Math.round(seconds))) }),
+
+      setCuratedList: ({ name, tokens }) =>
+        set((state) => ({
+          curatedName: name ?? state.curatedName,
+          curatedTokens: tokens ?? state.curatedTokens,
+        })),
     }),
     { name: 'panscreener.admin' },
   ),
@@ -227,6 +247,11 @@ export function startAdminSync() {
         urlTemplate: row.verdict_url_template,
         enabled: row.verdict_enabled,
       },
+      // Tolerant of a project that has not run migration 003 yet: the columns
+      // come back undefined, the list is empty, and the watchlist simply shows
+      // nothing extra rather than throwing on every page load.
+      curatedName: row.curated_list_name || DEFAULT_CURATED_NAME,
+      curatedTokens: parseCuratedTokens(row.curated_list_tokens),
     });
   };
 
@@ -298,6 +323,16 @@ export const adminBackend = {
     if (patch.urlTemplate !== undefined) row.verdict_url_template = patch.urlTemplate;
     if (patch.enabled !== undefined) row.verdict_enabled = patch.enabled;
     await supabase.from(TABLES.appSettings).update(row).eq('id', 1);
+  },
+
+  async setCuratedList(patch: { name?: string; tokens?: CuratedEntry[] }) {
+    if (!supabase) return useAdminStore.getState().setCuratedList(patch);
+    const row: Record<string, unknown> = {};
+    if (patch.name !== undefined) row.curated_list_name = patch.name.trim() || DEFAULT_CURATED_NAME;
+    if (patch.tokens !== undefined) row.curated_list_tokens = patch.tokens;
+    if (Object.keys(row).length === 0) return;
+    const { error } = await supabase.from(TABLES.appSettings).update(row).eq('id', 1);
+    return error ? { ok: false as const, error: error.message } : { ok: true as const };
   },
 
   async setPollSeconds(seconds: number) {
