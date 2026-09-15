@@ -49,6 +49,10 @@ export const TABLES = {
   listings: 'ps_listings',
   adSlides: 'ps_ad_slides',
   appSettings: 'ps_app_settings',
+  /* Writes go to the table; reads go to the view, which adds the author's
+     handle without exposing auth.users. */
+  reviews: 'ps_token_reviews',
+  reviewsPublic: 'ps_token_reviews_public',
 } as const;
 
 /** The server-side admin check. Admin status is never decided in the client. */
@@ -111,4 +115,19 @@ export interface AppSettingsRow {
   curated_list_name?: string;
   /** `{ symbol, address }` entries; the chain is resolved at display time. */
   curated_list_tokens?: unknown;
+}
+
+
+/** One community review, as the public view returns it. */
+export interface ReviewRow {
+  id: string;
+  chain: string;
+  address: string;
+  user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Local part of the reviewer's email. Never the address itself. */
+  author: string | null;
 }
