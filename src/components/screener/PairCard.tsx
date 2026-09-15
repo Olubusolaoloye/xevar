@@ -81,9 +81,11 @@ function PairCardBase({ pair, rank, timeframe }: PairCardProps) {
             <Sparkline data={pair.sparkline} width={64} height={20} />
             <span className="flex flex-1 items-center justify-between gap-3 text-[11px] text-ink-low">
               <span>
-                Liq{' '}
+                MCap{' '}
                 <span className="tnum font-mono text-ink-mid">
-                  {money(pair.liquidityUsd)}
+                  {/* Zero means neither market cap nor FDV was reported, which
+                      is not the same as a token worth nothing. */}
+                  {pair.marketCap > 0 ? money(pair.marketCap) : '—'}
                 </span>
               </span>
               <span>

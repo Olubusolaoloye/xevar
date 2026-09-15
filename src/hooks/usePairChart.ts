@@ -25,6 +25,12 @@ interface AsyncResult<T> {
  * makes switching chart ranges back and forth free.
  */
 export function usePairCandles(pair: Pair | undefined, interval: CandleInterval) {
+  // The feed hands every subscriber a fresh Pair object on each poll, so
+  // depending on `pair` itself re-ran this effect every 15 seconds: each run
+  // flipped `loading` back on and re-entered the cache for a pool whose
+  // candles had not changed. These three fields are what the request is
+  // actually built from.
+  const { id: pairId, chain, pairAddress } = pair ?? {};
   const [state, setState] = useState<AsyncResult<Candle[]>>({
     data: [],
     loading: true,
@@ -55,13 +61,18 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
     return () => {
       cancelled = true;
     };
-  }, [pair, interval]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `pair` is a new
+    // object every poll; these three fields are what the request depends on.
+  }, [pairId, chain, pairAddress, interval]);
 
   return state;
 }
 
 /** Real recent trades for a pair, refreshed on an interval. */
 export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
+  // Same reasoning as usePairCandles: key off stable identifiers, not the
+  // Pair object the feed replaces on every poll.
+  const { id: pairId, chain, pairAddress } = pair ?? {};
   const [state, setState] = useState<AsyncResult<Trade[]>>({
     data: [],
     loading: true,
@@ -92,7 +103,8 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [pair, refreshMs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above.
+  }, [pairId, chain, pairAddress, refreshMs]);
 
   return state;
 }

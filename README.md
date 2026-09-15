@@ -150,6 +150,43 @@ The publishable key in `.env.production` is not a secret — it grants exactly
 what the policies allow. The `service_role` key is a real secret and must never
 reach the client.
 
+## Listing a token
+
+Market data is free; presentation is not.
+
+Anyone can have a token tracked by supplying a contract address — price,
+liquidity, volume and flow are facts about a public pool, and nobody needs to
+pay to have facts reported. A logo, a banner, a description and outbound social
+links are *claims by whoever submitted them*, so they appear only after a
+payment is confirmed and an admin has reviewed the submission.
+
+| Listing status | What the token page shows |
+| --- | --- |
+| `tracking` | Market data only |
+| `pending` | Market data only, submission queued for review |
+| `approved` | Logo, banner, description and links go live |
+| `rejected` | Market data only, with a reason shown to the submitter |
+
+A missing status is treated as `tracking`, never as `approved` — a row written
+by a client that does not know about this workflow must not be able to publish
+a banner and a set of links by omitting a column.
+
+**The flow:** a developer creates an account at `/developer`, adds a contract
+address (tracked immediately), fills in the details they want shown, sends the
+$50 fee, pastes the transaction hash and submits. The submission lands in the
+admin review queue with the hash linked to the chain's explorer beside the
+address and amount it should have carried. The admin can also autolist any
+token directly, without a payment.
+
+None of this is enforced in the app. Row-level security is what actually stops
+a developer approving their own listing, marking it verified, featuring it,
+reassigning it to another account, or editing it after review — see
+`supabase/002_developer_listings.sql`. The client is a convenience; the
+policies are the boundary.
+
+**Verified** is a separate, stronger claim than approved: an admin asserting
+that a listing is the project it says it is. Only an admin can set it.
+
 **What is global vs local**
 
 | Global (admin-controlled) | Local to each visitor |

@@ -1,16 +1,7 @@
 import { Search } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { Wordmark } from '@/components/brand/Logo';
-import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { usePrefsStore, type Currency } from '@/store/usePrefsStore';
-import { ThemeToggle } from './ThemeToggle';
-
-const CURRENCIES = [
-  { value: 'USD' as Currency, label: '$' , title: 'US Dollar' },
-  { value: 'EUR' as Currency, label: '€', title: 'Euro' },
-  { value: 'GBP' as Currency, label: '£', title: 'Pound Sterling' },
-  { value: 'NGN' as Currency, label: '₦', title: 'Nigerian Naira' },
-] as const;
+import { DisplayMenu } from './DisplayMenu';
 
 /**
  * The application header.
@@ -20,9 +11,6 @@ const CURRENCIES = [
  * than being tucked into a corner.
  */
 export function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
-  const currency = usePrefsStore((s) => s.currency);
-  const setCurrency = usePrefsStore((s) => s.setCurrency);
-
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-3 border-b border-line bg-canvas/85 px-3 backdrop-blur-xl sm:px-4">
       {/* The rail owns the wordmark on desktop; below `lg` it lives here. */}
@@ -45,13 +33,7 @@ export function TopBar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </button>
 
       <div className="ml-auto flex items-center gap-2">
-        <ThemeToggle className="hidden sm:inline-flex" />
-        <SegmentedControl
-          options={CURRENCIES}
-          value={currency}
-          onChange={setCurrency}
-          size="sm"
-        />
+        <DisplayMenu />
       </div>
     </header>
   );

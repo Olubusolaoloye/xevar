@@ -209,7 +209,13 @@ export function PairDetail() {
               {pair.trendingRank && (
                 <Badge tone="warn">#{pair.trendingRank} trending</Badge>
               )}
-              {pair.tracked && !pair.tracked.pinned && (
+              {/* Verification is an admin's judgement that this is the real
+                  project. Pinning is a separate, narrower fact: that the board
+                  is quoting one specific contract rather than guessing from a
+                  ticker. Both are worth saying, and they are not the same
+                  claim. */}
+              {pair.tracked?.verified && <Badge tone="up">Verified</Badge>}
+              {pair.tracked && !pair.tracked.pinned && !pair.tracked.verified && (
                 <Badge tone="warn">Unverified ticker match</Badge>
               )}
             </div>
@@ -224,19 +230,25 @@ export function PairDetail() {
               </p>
             )}
 
+            {/* Shown, but deliberately not clickable.
+
+                A link out of a screener is the highest-trust thing on the
+                page: following one is how a visitor ends up approving a
+                contract. These destinations are supplied by whoever submitted
+                the listing, so until that submission has been paid for and
+                reviewed they are displayed as claims, not offered as
+                navigation. */}
             {socials.length > 0 && (
               <div className="mt-2.5 flex items-center gap-1.5">
                 {socials.map((social) => (
-                  <a
+                  <span
                     key={social.label}
-                    href={social.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={social.label}
-                    className="rounded-sm border border-line bg-sunken p-1.5 text-ink-low transition-colors hover:border-line-strong hover:text-ink"
+                    aria-label={`${social.label} (link inactive)`}
+                    title="Links are inactive until the listing is reviewed"
+                    className="cursor-not-allowed rounded-sm border border-line bg-sunken p-1.5 text-ink-dim opacity-60"
                   >
                     <social.icon className="h-3.5 w-3.5" />
-                  </a>
+                  </span>
                 ))}
               </div>
             )}
@@ -315,18 +327,6 @@ export function PairDetail() {
         </div>
 
         <div className="space-y-4">
-          <Panel className="overflow-hidden" elevation="raised">
-            <PnlCard pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            <ProfitCalculator pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            <ShareCards pair={pair} />
-          </Panel>
-
           <Panel className="overflow-hidden">
             <PanelHeader title="Performance" />
             <ChangeGrid pair={pair} />
@@ -335,14 +335,6 @@ export function PairDetail() {
           <Panel className="overflow-hidden">
             <PanelHeader title="Order flow" subtitle="Buy and sell pressure" />
             <FlowPanel pair={pair} />
-          </Panel>
-
-          <Panel className="overflow-hidden">
-            {pair.security.available ? (
-              <SecurityPanel security={pair.security} />
-            ) : (
-              <VerdictPanel pair={pair} />
-            )}
           </Panel>
 
           <Panel className="overflow-hidden">
@@ -358,6 +350,30 @@ export function PairDetail() {
                 address={pair.pairAddress}
                 explorer={chain.explorer}
               />
+              {/* Holders links out rather than printing a number.
+
+                  A count was shown here and it did not match the chain. There
+                  is no free, keyless provider whose holder figure can be
+                  trusted — the one available reports a value that is stale or
+                  means something other than "wallets holding this token", and
+                  a holder count is exactly the figure someone reads as a
+                  distribution check before buying. Being confidently wrong
+                  about it is worse than not answering.
+
+                  The explorer's own token page is the answer, so it is what
+                  this points at. */}
+              <a
+                href={`${chain.explorer}/token/${pair.baseToken.address}#balances`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-raised"
+              >
+                <span className="text-[11px] text-ink-low">Holders</span>
+                <span className="flex items-center gap-1 text-[11px] text-ink-mid">
+                  View on {chain.name} explorer
+                  <ExternalLink className="h-3 w-3 text-ink-dim" />
+                </span>
+              </a>
               <div className="flex items-center justify-between px-4 py-2.5">
                 <span className="text-[11px] text-ink-low">Makers (24h)</span>
                 <span className="tnum font-mono text-[11px] text-ink-mid">
@@ -379,6 +395,26 @@ export function PairDetail() {
                 </span>
               </div>
             </div>
+          </Panel>
+
+          <Panel className="overflow-hidden" elevation="raised">
+            <PnlCard pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ProfitCalculator pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <ShareCards pair={pair} />
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            {pair.security.available ? (
+              <SecurityPanel security={pair.security} />
+            ) : (
+              <VerdictPanel pair={pair} />
+            )}
           </Panel>
 
           <p className="px-1 text-[11px] leading-relaxed text-ink-dim">

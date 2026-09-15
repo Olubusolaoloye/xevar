@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -82,6 +82,10 @@ function ChartTooltip({
  */
 export function PriceChart({ pair }: { pair: Pair }) {
   const [range, setRange] = useState<Range>('24h');
+  // The multi-chart page mounts two of these. A hardcoded gradient id made the
+  // second chart resolve url(#priceFill) to the first one's definition, so a
+  // falling pair could be painted with a rising pair's gradient.
+  const fillId = useId();
   const { priceText, convert, symbol } = useCurrency();
 
   const spec = RANGE_SPEC[range];
@@ -118,7 +122,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
             <defs>
-              <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={color} stopOpacity={0.3} />
                 <stop offset="100%" stopColor={color} stopOpacity={0} />
               </linearGradient>
@@ -160,7 +164,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
               dataKey="close"
               stroke={color}
               strokeWidth={1.75}
-              fill="url(#priceFill)"
+              fill={`url(#${fillId})`}
               // Animating 160 points on every currency or range change is
               // distracting rather than delightful.
               isAnimationActive={false}

@@ -6,6 +6,8 @@ import { PairDetail } from '@/pages/PairDetail';
 import { Watchlist } from '@/pages/Watchlist';
 import { Portfolio } from '@/pages/Portfolio';
 import { Alerts } from '@/pages/Alerts';
+import { Developer } from '@/pages/Developer';
+import { Ads } from '@/pages/Ads';
 import { Settings } from '@/pages/Settings';
 import { Admin } from '@/pages/Admin';
 import { Section } from '@/pages/Section';
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="watchlist" element={<Watchlist />} />
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="alerts" element={<Alerts />} />
+          <Route path="developer" element={<Developer />} />
+          <Route path="ads" element={<Ads />} />
           <Route path="sections/:sectionId" element={<Section />} />
           <Route path="multichart" element={<MultiChart />} />
           <Route path="admin" element={<Admin />} />

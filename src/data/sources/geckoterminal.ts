@@ -62,8 +62,22 @@ export async function fetchCandles(
     `?aggregate=${aggregate}&limit=${Math.min(1000, limit)}&currency=usd`;
 
   const response = await getJson<OhlcvResponse>(url);
-  const rows = response.data?.attributes?.ohlcv_list ?? [];
+  return mapOhlcvRows(response.data?.attributes?.ohlcv_list ?? []);
+}
 
+/**
+ * Turn raw `ohlcv_list` rows into candles.
+ *
+ * Exported for tests. The filter is the load-bearing part: a bucket with no
+ * trades in it comes back as zeroes, and the currently forming bucket is
+ * usually one of those. `Number.isFinite(0)` is true, so guarding on finiteness
+ * alone let it through — which dropped the line to zero at the right edge,
+ * dragged the y-axis domain down to 0 so the real price variation was squashed
+ * into a sliver, and painted the whole chart red because the closing price now
+ * sat below the opening one. A period with no trades has no price: it is
+ * absent, not zero.
+ */
+export function mapOhlcvRows(rows: number[][]): Candle[] {
   return rows
     .map(([time, open, high, low, close, volume]) => ({
       // The API reports seconds; the rest of the app works in milliseconds.
@@ -74,7 +88,12 @@ export async function fetchCandles(
       close,
       volume,
     }))
-    .filter((candle) => Number.isFinite(candle.close))
+    .filter(
+      (candle) =>
+        Number.isFinite(candle.time) &&
+        Number.isFinite(candle.close) &&
+        candle.close > 0,
+    )
     .sort((a, b) => a.time - b.time);
 }
 
@@ -137,6 +156,18 @@ export async function fetchTrades(
     .filter((trade) => trade.valueUsd > 0)
     .sort((a, b) => b.timestamp - a.timestamp);
 }
+
+/* A holder count used to be fetched here, from this provider's
+   /tokens/{address}/info endpoint.
+
+   It was removed because the figure did not match the chain. Whether the field
+   is stale or means something other than "wallets holding this token" could
+   not be established, and a holder count is read as a distribution check by
+   someone deciding whether to buy — so a wrong one is worse than none. The
+   pair page links to the chain explorer's own token page instead.
+
+   Re-adding this needs a provider whose number can actually be checked against
+   an explorer, which in practice means a keyed API. */
 
 /** Whether a chain is covered by this provider. */
 export function supportsChain(chain: ChainId): boolean {

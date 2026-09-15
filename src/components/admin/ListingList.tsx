@@ -94,6 +94,8 @@ function EditRow({ token, onDone }: { token: Listing; onDone: () => void }) {
     telegram: token.telegram ?? '',
     note: token.note ?? '',
     featured: Boolean(token.featured),
+    verified: Boolean(token.verified),
+    approved: token.status === 'approved',
   });
 
   const set = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) =>
@@ -114,6 +116,11 @@ function EditRow({ token, onDone }: { token: Listing; onDone: () => void }) {
       telegram: clean(draft.telegram),
       note: clean(draft.note),
       featured: draft.featured,
+      verified: draft.verified,
+      // Admin autolisting: approving here publishes whatever presentation the
+      // listing carries without waiting on a payment, which is the operator's
+      // prerogative. Turning it off drops the listing back to tracking-only.
+      status: draft.approved ? 'approved' : 'tracking',
     });
     onDone();
   };
@@ -255,6 +262,20 @@ function EditRow({ token, onDone }: { token: Listing; onDone: () => void }) {
         onChange={(v) => set('featured', v)}
         label="Feature this listing"
         description="Pins it to the top of the board regardless of the active sort."
+      />
+
+      <Toggle
+        checked={draft.approved}
+        onChange={(v) => set('approved', v)}
+        label="Publish details (autolist)"
+        description="Shows the logo, banner, description and links above. Off means the token is tracked but presents market data only — which is what an unpaid listing looks like."
+      />
+
+      <Toggle
+        checked={draft.verified}
+        onChange={(v) => set('verified', v)}
+        label="Verified"
+        description="Your assertion that this is the project it claims to be. Separate from publishing details, and a stronger claim — a visitor reads the badge as you vouching for it."
       />
 
       <div className="flex justify-end gap-2 border-t border-line pt-3">

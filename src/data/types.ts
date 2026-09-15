@@ -7,6 +7,8 @@
  * swappable without touching a single component.
  */
 
+import type { ListingStatus } from './listingStatus';
+
 export type ChainId =
   | 'ethereum'
   | 'solana'
@@ -129,7 +131,14 @@ export interface Pair {
    * the right asset. False means it was matched by ticker alone, which can
    * resolve to an impostor sharing the symbol — the UI flags those.
    */
-  tracked?: { tokenId: string; pinned: boolean };
+  tracked?: {
+    tokenId: string;
+    pinned: boolean;
+    /** An admin has confirmed this is the project it claims to be. */
+    verified: boolean;
+    /** Where the listing sits in the paid-listing workflow. */
+    status: ListingStatus;
+  };
 }
 
 /** A single fill on the tape. */
@@ -159,7 +168,12 @@ export interface Candle {
 /* Alerts                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export type AlertMetric = 'price' | 'change24h' | 'liquidity' | 'volume24h';
+export type AlertMetric =
+  | 'price'
+  | 'marketCap'
+  | 'change24h'
+  | 'liquidity'
+  | 'volume24h';
 export type AlertComparator = 'above' | 'below';
 
 export interface Alert {

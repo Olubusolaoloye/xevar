@@ -58,7 +58,11 @@ export function MiniPairList({
                 {pair.baseToken.symbol}
               </span>
               <span className="block truncate text-[11px] text-ink-low">
-                {showAge ? `${formatAge(pair.createdAt)} old` : money(pair.liquidityUsd)}
+                {showAge
+                  ? `${formatAge(pair.createdAt)} old`
+                  : pair.marketCap > 0
+                    ? money(pair.marketCap)
+                    : '—'}
                 {' · '}
                 {pair.dex}
               </span>

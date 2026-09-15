@@ -1,6 +1,7 @@
 import { Panel } from '@/components/ui/Panel';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AddTokenPanel } from '@/components/admin/AddTokenPanel';
+import { ReviewQueue } from '@/components/admin/ReviewQueue';
 import { ListingList } from '@/components/admin/ListingList';
 import { FeedDiagnostics } from '@/components/admin/FeedDiagnostics';
 import { AdminGate } from '@/components/admin/AdminGate';
@@ -34,6 +35,12 @@ function AdminScreen() {
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-4">
+          {/* Leads the column: a submission sitting unreviewed is somebody
+              waiting on a payment they have already made. */}
+          <Panel className="overflow-hidden" elevation="raised">
+            <ReviewQueue />
+          </Panel>
+
           <Panel className="overflow-hidden" elevation="raised">
             <AddTokenPanel />
           </Panel>

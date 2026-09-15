@@ -73,6 +73,16 @@ export interface ListingRow {
   featured: boolean;
   position: number;
   created_at: string;
+
+  /* Paid listing workflow. Nullable because rows predating it exist. */
+  status: string | null;
+  verified: boolean | null;
+  owner_id: string | null;
+  payment_tx_hash: string | null;
+  contact_email: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
 }
 
 export interface AdSlideRow {

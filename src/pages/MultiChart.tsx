@@ -73,7 +73,7 @@ function ChartPane({ pair }: { pair: Pair }) {
             <ChainChip chain={pair.chain} compact />
           </span>
         }
-        subtitle={`${pair.dex} · Liq ${money(pair.liquidityUsd)}`}
+        subtitle={`${pair.dex} · MCap ${pair.marketCap > 0 ? money(pair.marketCap) : '—'}`}
         action={
           <Link to={`/pair/${pair.id}`}>
             <Button size="sm" variant="ghost">
