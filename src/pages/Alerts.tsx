@@ -9,6 +9,7 @@ import {
   conditionMet,
   metricFormat,
   readMetric,
+  alertActions,
   useAlertStore,
 } from '@/store/useAlertStore';
 import { Badge } from '@/components/ui/Badge';
@@ -17,6 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
+import { NotificationPanel } from '@/components/alerts/NotificationPanel';
 import { Toggle } from '@/components/ui/Toggle';
 import { ChainChip } from '@/components/ui/ChainChip';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -57,7 +59,7 @@ function describe(
 
 function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pairs = useMarketStore((s) => s.pairs);
-  const addAlert = useAlertStore((s) => s.addAlert);
+  const addAlert = alertActions.add;
 
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Pair | null>(null);
@@ -82,7 +84,7 @@ function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => voi
 
   const submit = () => {
     if (!valid || !selected) return;
-    addAlert({
+    void addAlert({
       pairId: selected.id,
       pairLabel: `${selected.baseToken.symbol} / ${selected.quoteToken.symbol}`,
       chain: selected.chain,
@@ -221,6 +223,13 @@ function CreateAlertModal({ open, onClose }: { open: boolean; onClose: () => voi
  * answered — either way — the browser will not ask again, so a button that
  * stays on screen would do nothing when pressed.
  */
+/**
+ * Ask for desktop notification permission.
+ *
+ * Only shown while alerts are evaluated in this browser. Once the server owns
+ * them, the Delivery panel is the real control — offering a weaker, tab-only
+ * version of the same thing beside it would just be confusing.
+ */
 function NotifyOptIn() {
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(
     typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
@@ -255,10 +264,11 @@ function NotifyOptIn() {
 export function Alerts() {
   const alerts = useAlertStore((s) => s.alerts);
   const events = useAlertStore((s) => s.events);
-  const toggleAlert = useAlertStore((s) => s.toggleAlert);
-  const removeAlert = useAlertStore((s) => s.removeAlert);
-  const markEventsRead = useAlertStore((s) => s.markEventsRead);
-  const clearEvents = useAlertStore((s) => s.clearEvents);
+  const serverMode = useAlertStore((s) => s.serverMode);
+  const toggleAlert = alertActions.toggle;
+  const removeAlert = alertActions.remove;
+  const markEventsRead = alertActions.markEventsRead;
+  const clearEvents = alertActions.clearEvents;
   const pairs = useMarketStore((s) => s.pairs);
   const { compact: money, priceText } = useCurrency();
 
@@ -266,7 +276,7 @@ export function Alerts() {
 
   // Looking at the page is what marks the log as seen.
   useEffect(() => {
-    if (events.some((e) => !e.read)) markEventsRead();
+    if (events.some((e) => !e.read)) void markEventsRead();
   }, [events, markEventsRead]);
 
   const active = alerts.filter((alert) => alert.enabled).length;
@@ -285,7 +295,11 @@ export function Alerts() {
         }
       />
 
-      <Panel className="mt-5 overflow-hidden">
+      <Panel className="mt-5 overflow-hidden" elevation="raised">
+        <NotificationPanel />
+      </Panel>
+
+      <Panel className="mt-4 overflow-hidden">
         <PanelHeader
           title="Your alerts"
           subtitle={`${active} active of ${alerts.length}`}
@@ -364,10 +378,10 @@ export function Alerts() {
                   <div className="flex shrink-0 items-center gap-3">
                     <Toggle
                       checked={alert.enabled}
-                      onChange={() => toggleAlert(alert.id)}
+                      onChange={() => void toggleAlert(alert.id)}
                     />
                     <button
-                      onClick={() => removeAlert(alert.id)}
+                      onClick={() => void removeAlert(alert.id)}
                       aria-label="Delete alert"
                       className="rounded-sm p-1.5 text-ink-dim transition-colors hover:bg-down/10 hover:text-down"
                     >
@@ -381,7 +395,7 @@ export function Alerts() {
         )}
       </Panel>
 
-      <NotifyOptIn />
+      {!serverMode && <NotifyOptIn />}
 
       {(alerts.length > 0 || events.length > 0) && (
       <Panel className="mt-4 overflow-hidden">
@@ -391,7 +405,7 @@ export function Alerts() {
           icon={<History className="h-4 w-4" />}
           action={
             events.length > 0 ? (
-              <Button size="sm" variant="ghost" onClick={clearEvents}>
+              <Button size="sm" variant="ghost" onClick={() => void clearEvents()}>
                 Clear
               </Button>
             ) : undefined
@@ -432,12 +446,26 @@ export function Alerts() {
       </Panel>
       )}
 
+      {/* Two genuinely different behaviours, so two different explanations.
+          Leaving the local wording up for a signed-in account would describe a
+          product that is no longer running. */}
       <p className="mt-3 px-1 text-[11px] leading-relaxed text-ink-dim">
-        Conditions are checked against the live board every time it refreshes,
-        on whichever page you are on. An alert fires when its condition is
-        crossed, not for every refresh it stays true, and re-arms once the
-        condition clears. Delivery is in-app, plus a desktop notification if you
-        allow one — there is no email or push in this build.
+        An alert fires when its condition is crossed, not for every check it
+        stays true, and re-arms once the condition clears.{' '}
+        {serverMode ? (
+          <>
+            Your alerts are checked on the server every minute, whether or not
+            PanScreener is open, and delivered to the devices you have
+            registered and by email.
+          </>
+        ) : (
+          <>
+            These alerts are checked in this browser, against the live board, on
+            whichever page you are on — which means they only fire while
+            PanScreener is open. Sign in above to have them checked on the
+            server and pushed to your devices instead.
+          </>
+        )}
       </p>
 
       <CreateAlertModal open={createOpen} onClose={() => setCreateOpen(false)} />

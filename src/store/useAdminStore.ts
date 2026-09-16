@@ -103,6 +103,11 @@ interface AdminState {
   /** True while the app is closed to everyone but the admin. */
   locked: boolean;
   /**
+   * Web Push application server key, published by the dispatcher on its first
+   * run. Public by design: the browser needs it to subscribe.
+   */
+  vapidPublicKey: string;
+  /**
    * Whether settings have been fetched at least once this session.
    *
    * The shell holds the app back until this is true, so the lock cannot be
@@ -143,6 +148,7 @@ export const useAdminStore = create<AdminState>()(
          the app, with nothing they could do about it. The switch is read
          from the backend every time. */
       locked: false,
+      vapidPublicKey: '',
       settingsReady: !hasBackend,
       lockTitle: DEFAULT_LOCK_TITLE,
       lockMessage: DEFAULT_LOCK_MESSAGE,
@@ -205,9 +211,10 @@ export const useAdminStore = create<AdminState>()(
       name: 'panscreener.admin',
       /* Everything except the lock. See the comment on `locked` above: a
          cached `true` would outlive the operator reopening the app. */
-      partialize: ({ locked, settingsReady, lockTitle, lockMessage, ...rest }) => {
+      partialize: ({ locked, settingsReady, lockTitle, lockMessage, vapidPublicKey, ...rest }) => {
         void locked;
         void settingsReady;
+        void vapidPublicKey;
         void lockTitle;
         void lockMessage;
         return rest;
@@ -307,6 +314,7 @@ export function startAdminSync() {
       curatedName: row.curated_list_name || DEFAULT_CURATED_NAME,
       curatedTokens: parseCuratedTokens(row.curated_list_tokens),
       locked: Boolean(row.app_locked),
+      vapidPublicKey: row.vapid_public_key ?? '',
       settingsReady: true,
       lockTitle: row.lock_title || DEFAULT_LOCK_TITLE,
       lockMessage: row.lock_message || DEFAULT_LOCK_MESSAGE,
