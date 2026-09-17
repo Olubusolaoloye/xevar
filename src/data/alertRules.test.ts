@@ -4,6 +4,7 @@ import {
   evaluateAlert,
   metricReported,
   readMetricValue,
+  subscriptPrice,
   type AlertReadable,
   type EvaluableAlert,
 } from './alertRules';
@@ -129,5 +130,36 @@ describe('evaluateAlert', () => {
       pair({ marketCap: 119_000 }),
     );
     expect(falling.action).toBe('fire');
+  });
+});
+
+describe('subscriptPrice', () => {
+  it('writes a memecoin price the way the board does', () => {
+    // The whole point: not "$0.00", and not "6.800e-8".
+    expect(subscriptPrice(0.000000068)).toBe('$0.0₇6800');
+  });
+
+  it('counts the zeros correctly', () => {
+    expect(subscriptPrice(0.00001234)).toBe('$0.0₄1234');
+    expect(subscriptPrice(0.000001234)).toBe('$0.0₅1234');
+  });
+
+  it('leaves readable small numbers expanded', () => {
+    // Three zeros is still easier to read written out than compressed.
+    expect(subscriptPrice(0.001234)).toBe('$0.001234');
+  });
+
+  it('handles ordinary and large values without a subscript', () => {
+    expect(subscriptPrice(1.5)).toBe('$1.50');
+    expect(subscriptPrice(4_100_000)).toBe('$4,100,000.00');
+  });
+
+  it('keeps the sign', () => {
+    expect(subscriptPrice(-0.000000068)).toBe('-$0.0₇6800');
+  });
+
+  it('does not invent a price for a missing one', () => {
+    expect(subscriptPrice(0)).toBe('$0.00');
+    expect(subscriptPrice(Number.NaN)).toBe('$0.00');
   });
 });

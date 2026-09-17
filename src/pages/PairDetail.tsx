@@ -37,6 +37,7 @@ import { VerdictPanel } from '@/components/pair/VerdictPanel';
 import { PnlCard } from '@/components/pair/PnlCard';
 import { ProfitCalculator } from '@/components/pair/ProfitCalculator';
 import { ShareCards } from '@/components/pair/ShareCards';
+import { CommunityPanel } from '@/components/compare/CommunityPanel';
 import type { Pair } from '@/data/types';
 
 /** A copyable on-chain address with an explorer link. */
@@ -340,6 +341,21 @@ export function PairDetail() {
             ) : (
               <VerdictPanel pair={pair} />
             )}
+          </Panel>
+
+          {/* What people make of it.
+
+              The same panel the comparison page uses, and deliberately the
+              same one: a rating left here has to be the rating counted there,
+              or the two screens would disagree about the same token. It sits
+              in the wide column because it is mostly prose — comments read
+              badly at sidebar width. */}
+          <Panel className="overflow-hidden">
+            <PanelHeader
+              title="Community"
+              subtitle={`What people make of ${pair.baseToken.symbol}`}
+            />
+            <CommunityPanel pair={pair} />
           </Panel>
 
           <Panel className="overflow-hidden">

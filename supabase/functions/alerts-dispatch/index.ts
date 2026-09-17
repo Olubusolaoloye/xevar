@@ -18,6 +18,7 @@ import {
   ALERT_METRIC_TEXT,
   evaluateAlert,
   metricFormatOf,
+  subscriptPrice,
   type AlertMetricName,
   type AlertComparatorName,
   type AlertReadable,
@@ -155,10 +156,9 @@ async function fetchPairs(alerts: AlertRow[]): Promise<Map<string, AlertReadable
 function formatValue(metric: AlertMetricName, value: number): string {
   const shape = metricFormatOf(metric);
   if (shape === 'percent') return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
-  if (shape === 'price') {
-    // Memecoin prices need real precision; a compact "$0.00" says nothing.
-    return value < 0.01 ? `$${value.toPrecision(4)}` : `$${value.toFixed(4)}`;
-  }
+  // Shared with the app, so a notification reads like the board rather than
+  // like a scientific calculator: $0.0₇6800, not 6.800e-8.
+  if (shape === 'price') return subscriptPrice(value);
   if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
   if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;

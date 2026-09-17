@@ -100,6 +100,25 @@ async function fetchToken(chain: string, address: string) {
   }));
 }
 
+/**
+ * What to tell someone whose review would not save.
+ *
+ * The daily limit is raised by a trigger, so it arrives as a Postgres error
+ * rather than as a status the client can read off a field. Its message is
+ * written for the reader and passed through as-is; anything else is reduced to
+ * something true but unalarming, because a raw Postgres string in a review box
+ * tells the user nothing they can act on.
+ */
+export const DAILY_LIMIT_MARKER = 'already posted about this token today';
+
+function submitError(message: string): string {
+  if (message.toLowerCase().includes(DAILY_LIMIT_MARKER)) {
+    return 'You have already posted about this token today. Come back tomorrow, or edit what you wrote.';
+  }
+  if (message.includes('row-level security')) return 'Sign in to post a review.';
+  return 'Could not save your review. Try again.';
+}
+
 export const reviewBackend = {
   enabled: hasBackend,
 
@@ -142,13 +161,17 @@ export const reviewBackend = {
   },
 
   /**
-   * Post or update the caller's review of one token.
+   * Post the caller's review of one token, or edit the one they wrote today.
    *
-   * An upsert on (chain, address, user_id): reviewing a token twice edits the
-   * first review rather than adding a second, which is what stops anybody
-   * weighting the average by posting repeatedly. The database enforces that
-   * with a unique constraint; this just avoids showing the user an error for
-   * something they are allowed to do.
+   * Two different writes behind one call. With `editId` it updates that row —
+   * the post is still theirs and still today's, so revising it is just typing.
+   * Without one it inserts, and the database's daily trigger decides whether
+   * that is allowed.
+   *
+   * The limit is not checked here first. A browser check would be a courtesy
+   * to honest users and nothing at all to anyone else: the anon key is in the
+   * bundle, so the REST endpoint is open to whoever wants it. Postgres is the
+   * only place the rule can actually hold, and this reads back what it said.
    */
   async submit(input: {
     chain: string;
@@ -156,30 +179,30 @@ export const reviewBackend = {
     userId: string;
     rating: number;
     comment: string;
+    editId?: string | null;
   }): Promise<{ ok: boolean; error?: string }> {
     if (!supabase) return { ok: false, error: 'No backend is configured.' };
 
     const rating = Math.round(input.rating);
     if (rating < 1 || rating > 5) return { ok: false, error: 'Pick one to five stars.' };
 
-    const { error } = await supabase.from(TABLES.reviews).upsert(
-      {
-        chain: input.chain.toLowerCase(),
-        address: input.address.toLowerCase(),
-        user_id: input.userId,
-        rating,
-        comment: input.comment.trim() || null,
-      },
-      { onConflict: 'chain,address,user_id' },
-    );
+    const words = { rating, comment: input.comment.trim() || null };
+
+    // An edit sends only what an edit can change. The chain, the address and
+    // the author are what the row *is*, not what it says, and a trigger would
+    // put them back anyway — sending them would just be asking the database a
+    // question it has already answered.
+    const { error } = input.editId
+      ? await supabase.from(TABLES.reviews).update(words).eq('id', input.editId)
+      : await supabase.from(TABLES.reviews).insert({
+          ...words,
+          chain: input.chain.toLowerCase(),
+          address: input.address.toLowerCase(),
+          user_id: input.userId,
+        });
 
     if (error) {
-      return {
-        ok: false,
-        error: error.message.includes('row-level security')
-          ? 'Sign in to post a review.'
-          : 'Could not save your review. Try again.',
-      };
+      return { ok: false, error: submitError(error.message) };
     }
 
     await fetchToken(input.chain, input.address);

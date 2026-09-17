@@ -16,9 +16,34 @@ import type { Pair } from '@/data/types';
 type SizeMode = 'tokens' | 'usd';
 
 const SIZE_OPTIONS = [
-  { value: 'usd' as SizeMode, label: 'Spent' },
   { value: 'tokens' as SizeMode, label: 'Tokens' },
+  { value: 'usd' as SizeMode, label: 'Spent' },
 ];
+
+/** How the entry is expressed: the price paid, or the cap it was bought at. */
+type EntryMode = 'price' | 'marketCap';
+
+const ENTRY_OPTIONS = [
+  { value: 'price' as EntryMode, label: 'Price' },
+  { value: 'marketCap' as EntryMode, label: 'Market cap' },
+];
+
+/**
+ * Supply implied by the provider's own figures.
+ *
+ * Market cap divided by price. It is a restatement of the cap rather than an
+ * independent supply number, which is exactly what makes it the right
+ * conversion here: an entry given as "I bought at a 120k cap" has to land on
+ * the same scale the cap is quoted on, whatever that scale really is.
+ *
+ * Null when either figure is missing, because a supply of zero or infinity
+ * would silently turn a real entry into a meaningless one.
+ */
+function impliedSupply(pair: Pair): number | null {
+  if (!Number.isFinite(pair.marketCap) || pair.marketCap <= 0) return null;
+  if (!Number.isFinite(pair.priceUsd) || pair.priceUsd <= 0) return null;
+  return pair.marketCap / pair.priceUsd;
+}
 
 /**
  * The position card.
@@ -37,10 +62,13 @@ export function PnlCard({ pair }: { pair: Pair }) {
   const remove = usePositionsStore((s) => s.remove);
 
   const [open, setOpen] = useState(false);
-  const [sizeMode, setSizeMode] = useState<SizeMode>('usd');
+  const [sizeMode, setSizeMode] = useState<SizeMode>('tokens');
   const [size, setSize] = useState('');
+  const [entryMode, setEntryMode] = useState<EntryMode>('price');
   const [entryPrice, setEntryPrice] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const supply = impliedSupply(pair);
 
   const mine = useMemo(
     () => entries.filter((entry) => entry.pairId === pair.id),
@@ -54,14 +82,33 @@ export function PnlCard({ pair }: { pair: Pair }) {
 
   const submit = () => {
     const sizeValue = Number.parseFloat(size);
-    const priceValue = (Number.parseFloat(entryPrice) || 0) / rate;
+    const entered = Number.parseFloat(entryPrice) || 0;
+
+    /* A cap is converted to a per-token price through the implied supply, so
+       everything downstream — the blend, the P&L, the stored entry — still
+       works in one unit. Storing the cap instead would mean every consumer
+       had to know which of two things `entryPriceUsd` held. */
+    const priceValue =
+      entryMode === 'marketCap'
+        ? supply && supply > 0
+          ? entered / rate / supply
+          : 0
+        : entered / rate;
 
     if (!Number.isFinite(sizeValue) || sizeValue <= 0) {
       setError('Enter how much you bought.');
       return;
     }
+    if (entryMode === 'marketCap' && !supply) {
+      setError('No market cap is reported for this token, so a cap entry cannot be converted.');
+      return;
+    }
     if (priceValue <= 0) {
-      setError('Enter the price you paid per token.');
+      setError(
+        entryMode === 'marketCap'
+          ? 'Enter the market cap you bought at.'
+          : 'Enter the price you paid per token.',
+      );
       return;
     }
 
@@ -138,19 +185,47 @@ export function PnlCard({ pair }: { pair: Pair }) {
               }}
               onKeyDown={(event) => event.key === 'Enter' && submit()}
               inputMode="decimal"
-              placeholder="entry price"
+              placeholder={entryMode === 'marketCap' ? '120000' : 'entry price'}
               suffix={<span className="text-xs">{symbol}</span>}
             />
           </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-ink-mid">Bought at</span>
+            <SegmentedControl<EntryMode>
+              options={ENTRY_OPTIONS}
+              value={entryMode}
+              onChange={(next) => {
+                setEntryMode(next);
+                // The number means something different now; keeping it would
+                // read a price as a cap or the other way round.
+                setEntryPrice('');
+                setError(null);
+              }}
+              size="sm"
+            />
+          </div>
+
+          {entryMode === 'marketCap' && !supply && (
+            <p className="rounded-sm border border-warn/25 bg-warn/10 px-2.5 py-1.5 text-[11px] leading-relaxed text-warn">
+              This token has no market cap reported, so there is nothing to
+              convert a cap entry against. Use the price instead.
+            </p>
+          )}
 
           {error && <p className="text-xs text-down">{error}</p>}
 
           <div className="flex items-center justify-between gap-3">
             <button
-              onClick={() => setEntryPrice(String(pair.priceUsd * rate))}
-              className="text-[11px] text-ink-low underline-offset-2 transition-colors hover:text-brand-500 hover:underline"
+              onClick={() =>
+                setEntryPrice(
+                  String(entryMode === 'marketCap' ? pair.marketCap * rate : pair.priceUsd * rate),
+                )
+              }
+              disabled={entryMode === 'marketCap' && !supply}
+              className="text-[11px] text-ink-low underline-offset-2 transition-colors hover:text-brand-500 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Use current price
+              {entryMode === 'marketCap' ? 'Use current cap' : 'Use current price'}
             </button>
             <Button size="sm" variant="primary" onClick={submit}>
               Add entry

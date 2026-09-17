@@ -22,6 +22,15 @@ import type { Pair } from '@/data/types';
 
 const MAX_COMMENT = 1000;
 
+/**
+ * How long a post counts as "today's".
+ *
+ * Twenty-three hours, matching the trigger in the database exactly. A window
+ * that differed would show an edit form for a post the server has already let
+ * go of, or refuse an edit the server would have taken.
+ */
+const POST_WINDOW_MS = 23 * 60 * 60 * 1000;
+
 /** How a token's own reviews break down, as a bar per star. */
 function Distribution({ reviews }: { reviews: Review[] }) {
   const strength = communityStrength(reviews);
@@ -113,11 +122,11 @@ function ReviewList({
   );
 }
 
-function ReviewForm({ pair, existing }: { pair: Pair; existing: Review | null }) {
+function ReviewForm({ pair, today }: { pair: Pair; today: Review | null }) {
   const userId = useAuthStore((s) => s.userId);
 
-  const [rating, setRating] = useState(existing?.rating ?? 0);
-  const [comment, setComment] = useState(existing?.comment ?? '');
+  const [rating, setRating] = useState(today?.rating ?? 0);
+  const [comment, setComment] = useState(today?.comment ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -125,9 +134,9 @@ function ReviewForm({ pair, existing }: { pair: Pair; existing: Review | null })
   // A review posted from another device arrives over realtime. Adopt it, so
   // the form edits what is actually stored rather than a stale draft.
   useEffect(() => {
-    setRating(existing?.rating ?? 0);
-    setComment(existing?.comment ?? '');
-  }, [existing?.id, existing?.rating, existing?.comment]);
+    setRating(today?.rating ?? 0);
+    setComment(today?.comment ?? '');
+  }, [today?.id, today?.rating, today?.comment]);
 
   const submit = async () => {
     if (!userId) return;
@@ -140,6 +149,9 @@ function ReviewForm({ pair, existing }: { pair: Pair; existing: Review | null })
       userId,
       rating,
       comment,
+      // Today's post is edited in place; anything older is left standing and
+      // this becomes a new entry in the conversation.
+      editId: today?.id ?? null,
     });
 
     setBusy(false);
@@ -155,7 +167,7 @@ function ReviewForm({ pair, existing }: { pair: Pair; existing: Review | null })
     <div className="space-y-2.5 border-t border-line px-4 py-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-medium text-ink-mid">
-          {existing ? 'Your review' : `Rate ${pair.baseToken.symbol}`}
+          {today ? 'Your post today' : `Rate ${pair.baseToken.symbol}`}
         </p>
         <StarInput value={rating} onChange={setRating} disabled={busy} />
       </div>
@@ -191,13 +203,13 @@ function ReviewForm({ pair, existing }: { pair: Pair; existing: Review | null })
         disabled={busy || rating < 1}
         onClick={() => void submit()}
       >
-        {saved ? 'Saved' : busy ? 'Saving…' : existing ? 'Update review' : 'Post review'}
+        {saved ? 'Saved' : busy ? 'Saving…' : today ? 'Update today’s post' : 'Post review'}
       </Button>
 
       <p className="text-[10px] leading-relaxed text-ink-dim">
-        One review per token. Posting again edits this one, so nobody can weight
-        the score by rating twice. Your handle is the part of your email before
-        the @ — the address itself is never shown.
+        One post a day per token, and one vote: your latest star is the one the
+        score counts, however often you write. Your handle is the part of your
+        email before the @ — the address itself is never shown.
       </p>
     </div>
   );
@@ -211,7 +223,20 @@ function ReviewForm({ pair, existing }: { pair: Pair; existing: Review | null })
  * data/communityScore.ts for why, and for what the prior costs a token with
  * one glowing review.
  */
-export function CommunityPanel({ pair }: { pair: Pair }) {
+export function CommunityPanel({
+  pair,
+  showAuth = true,
+}: {
+  pair: Pair;
+  /**
+   * Whether a signed-out reader gets the sign-in form here.
+   *
+   * Two of these panels sit side by side on the comparison page, and two
+   * email-and-password forms on one screen reads as two different accounts to
+   * make. The page renders one form above both and switches this off.
+   */
+  showAuth?: boolean;
+}) {
   const email = useAuthStore((s) => s.email);
   const userId = useAuthStore((s) => s.userId);
   const isAdmin = useAuthStore((s) => s.isAdmin);
@@ -224,10 +249,19 @@ export function CommunityPanel({ pair }: { pair: Pair }) {
   }, [pair.chain, pair.baseToken.address]);
 
   const strength = useMemo(() => communityStrength(reviews), [reviews]);
-  const mine = useMemo(
-    () => reviews.find((review) => review.userId === userId) ?? null,
-    [reviews, userId],
-  );
+
+  /* The post this person has already made today, if any — what the form
+     edits. Older posts of theirs are left alone: they are what somebody said
+     last week, and a form that quietly overwrote them would make the daily
+     limit pointless in the other direction. */
+  const todays = useMemo(() => {
+    if (!userId) return null;
+    const own = reviews
+      .filter((review) => review.userId === userId)
+      .sort((a, b) => b.createdAt - a.createdAt);
+    const latest = own[0];
+    return latest && Date.now() - latest.createdAt < POST_WINDOW_MS ? latest : null;
+  }, [reviews, userId]);
 
   if (!hasBackend) {
     return (
@@ -300,18 +334,20 @@ export function CommunityPanel({ pair }: { pair: Pair }) {
       </div>
 
       {email && userId ? (
-        <ReviewForm pair={pair} existing={mine} />
+        <ReviewForm pair={pair} today={todays} />
       ) : (
         <div className="border-t border-line p-4">
-          <p className="mb-3 flex items-center gap-1.5 text-[11px] text-ink-low">
+          <p className="flex items-center gap-1.5 text-[11px] text-ink-low">
             <Users className="h-3 w-3" />
             Sign in to rate {pair.baseToken.symbol} and leave a comment.
           </p>
-          <AuthForm
-            idPrefix={`rev-${pair.id}`}
-            signUpLabel="Create account"
-            className="overflow-hidden"
-          />
+          {showAuth && (
+            <AuthForm
+              idPrefix={`rev-${pair.id}`}
+              signUpLabel="Create account"
+              className="mt-3 overflow-hidden"
+            />
+          )}
         </div>
       )}
     </div>

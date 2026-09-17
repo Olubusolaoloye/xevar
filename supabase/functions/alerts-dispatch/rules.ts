@@ -137,3 +137,50 @@ export const ALERT_METRIC_TEXT: Record<AlertMetricName, string> = {
   liquidity: 'Liquidity',
   volume24h: '24h volume',
 };
+
+/**
+ * A sub-cent price written the way the app writes it.
+ *
+ * A memecoin trades at 0.000000068, and the obvious formatters both fail it:
+ * toFixed(2) rounds the whole thing to $0.00, and toPrecision gives
+ * "6.800e-8", which is correct, unambiguous, and looks nothing like the
+ * product. The board uses a subscript run instead — $0.0₇68, where the 7 counts
+ * the zeros after the point — and a notification is the one place the number is
+ * read away from the app, so it should not be the one place it is unfamiliar.
+ *
+ * Lives here, with the rules, because this is the file the server gets a copy
+ * of; see lib/format.ts for the richer version the UI renders as real markup.
+ */
+export function subscriptPrice(value: number, symbol = '$'): string {
+  if (!Number.isFinite(value) || value === 0) return `${symbol}0.00`;
+
+  const sign = value < 0 ? '-' : '';
+  const abs = Math.abs(value);
+
+  if (abs >= 1) {
+    const decimals = abs >= 1000 ? 2 : 4;
+    return `${sign}${symbol}${abs.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: decimals,
+    })}`;
+  }
+
+  const exponent = Math.floor(Math.log10(abs));
+  const leadingZeros = Math.abs(exponent) - 1;
+  const significant = abs
+    .toFixed(Math.min(20, Math.abs(exponent) + 4))
+    .slice(2)
+    .replace(/^0+/, '')
+    .slice(0, 4);
+
+  // Only worth compressing once the zeros actually hurt to read.
+  if (leadingZeros >= 4) {
+    const subscript = String(leadingZeros).replace(/\d/g, (d) => SUBSCRIPT_DIGITS[Number(d)]);
+    return `${sign}${symbol}0.0${subscript}${significant}`;
+  }
+
+  return `${sign}${symbol}0.${'0'.repeat(leadingZeros)}${significant}`;
+}
+
+const SUBSCRIPT_DIGITS = ['\u2080', '\u2081', '\u2082', '\u2083', '\u2084',
+                          '\u2085', '\u2086', '\u2087', '\u2088', '\u2089'];
