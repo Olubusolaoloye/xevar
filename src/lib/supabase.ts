@@ -53,6 +53,10 @@ export const TABLES = {
      handle without exposing auth.users. */
   reviews: 'ps_token_reviews',
   reviewsPublic: 'ps_token_reviews_public',
+  alerts: 'ps_alerts',
+  pushSubscriptions: 'ps_push_subscriptions',
+  alertDeliveries: 'ps_alert_deliveries',
+  notificationPrefs: 'ps_notification_prefs',
 } as const;
 
 /** The server-side admin check. Admin status is never decided in the client. */
@@ -122,6 +126,8 @@ export interface AppSettingsRow {
   app_locked?: boolean;
   lock_title?: string;
   lock_message?: string;
+  /** Web Push application server key. Public by design — see lib/push.ts. */
+  vapid_public_key?: string | null;
 }
 
 

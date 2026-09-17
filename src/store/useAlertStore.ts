@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useAuthStore } from '@/store/useAuthStore';
 import type { Alert, AlertMetric, Pair } from '@/data/types';
 
 /* -------------------------------------------------------------------------- */
@@ -18,6 +19,19 @@ export interface AlertEvent {
   value: number;
   at: number;
   read: boolean;
+  /**
+   * How the server actually delivered it.
+   *
+   * Only present on alerts evaluated server-side — a local alert has no
+   * channels to report, and saying "push: false" about one would suggest a
+   * delivery was attempted and failed rather than never applying.
+   */
+  delivery?: {
+    push: boolean;
+    email: boolean;
+    /** Why a channel did not go out, when one did not. */
+    note?: string;
+  };
 }
 
 /** Oldest events past this count are dropped — this is a log, not an archive. */
@@ -100,6 +114,16 @@ interface AlertState {
    */
   met: Record<string, boolean>;
 
+  /**
+   * Whether the server owns evaluation for this session.
+   *
+   * True once a signed-in account's alerts have been loaded from Postgres.
+   * While it is true this store stops evaluating locally — the dispatcher is
+   * already doing it every minute, and both running would fire twice for the
+   * same crossing: once as a push and once as a desktop notice.
+   */
+  serverMode: boolean;
+
   addAlert: (alert: Omit<Alert, 'id' | 'createdAt'>) => void;
   toggleAlert: (id: string) => void;
   removeAlert: (id: string) => void;
@@ -141,6 +165,7 @@ export const useAlertStore = create<AlertState>()(
       alerts: [],
       events: [],
       met: {},
+      serverMode: false,
 
       addAlert: (alert) =>
         set((state) => ({
@@ -167,7 +192,12 @@ export const useAlertStore = create<AlertState>()(
         })),
 
       evaluate: (pairs) => {
-        const { alerts, met } = get();
+        const { alerts, met, serverMode } = get();
+        /* The dispatcher is evaluating these every minute against the same
+           rules (data/alertRules.ts is shared verbatim), so evaluating again
+           here would fire twice for one crossing — a push and a desktop
+           notice, seconds apart, saying the same thing. */
+        if (serverMode) return;
         if (alerts.length === 0 || pairs.length === 0) return;
 
         const nextMet: Record<string, boolean> = { ...met };
@@ -255,3 +285,120 @@ export const useAlertStore = create<AlertState>()(
 export function selectUnreadCount(state: AlertState): number {
   return state.events.filter((e) => !e.read).length;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Server sync                                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Hand evaluation to the server for a signed-in account, or take it back.
+ *
+ * Called whenever the session changes. Signing in replaces the local list with
+ * the account's server alerts and stops local evaluation; signing out restores
+ * whatever was persisted in this browser, which is the whole point of keeping
+ * the local path alive.
+ *
+ * `serverMode` is only set once alerts have actually arrived. A failed load
+ * leaves the store local, so a network blip degrades to "alerts still work in
+ * this tab" rather than to "alerts silently stopped".
+ */
+export async function syncAlertsWithAccount(signedIn: boolean) {
+  if (!signedIn) {
+    useAlertStore.setState({ serverMode: false, met: {} });
+    // The persisted local alerts are still in storage; rehydrate them so
+    // signing out does not leave an empty list on screen.
+    void useAlertStore.persist?.rehydrate?.();
+    return;
+  }
+
+  const { alertBackend } = await import('./alertBackend');
+  const loaded = await alertBackend.list();
+  if (!loaded) return;
+
+  useAlertStore.setState({
+    alerts: loaded.alerts,
+    events: loaded.events,
+    serverMode: true,
+    met: {},
+  });
+}
+
+/** Re-read the account's alerts and firing history. */
+export async function refreshServerAlerts() {
+  if (!useAlertStore.getState().serverMode) return;
+  const { alertBackend } = await import('./alertBackend');
+  const loaded = await alertBackend.list();
+  if (loaded) useAlertStore.setState({ alerts: loaded.alerts, events: loaded.events });
+}
+
+/* -------------------------------------------------------------------------- */
+/* One set of actions, two destinations                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the UI calls, regardless of where the alert actually lives.
+ *
+ * Without this every screen touching an alert would need to know whether the
+ * session is signed in and branch on it, and the day one of them forgot would
+ * be the day somebody's alert silently saved to the wrong place.
+ */
+export const alertActions = {
+  async add(alert: Omit<Alert, 'id' | 'createdAt'>): Promise<{ ok: boolean; error?: string }> {
+    if (!useAlertStore.getState().serverMode) {
+      useAlertStore.getState().addAlert(alert);
+      return { ok: true };
+    }
+
+    const userId = useAuthStore.getState().userId;
+    if (!userId) return { ok: false, error: 'Sign in again to save this alert.' };
+
+    const { alertBackend } = await import('./alertBackend');
+    const result = await alertBackend.add(userId, alert);
+    if (result.ok) await refreshServerAlerts();
+    return result;
+  },
+
+  async toggle(id: string) {
+    const state = useAlertStore.getState();
+    if (!state.serverMode) return state.toggleAlert(id);
+
+    const alert = state.alerts.find((a) => a.id === id);
+    if (!alert) return;
+
+    // Applied locally first so the switch moves under the finger; the refresh
+    // below reconciles with whatever the database actually stored.
+    useAlertStore.setState({
+      alerts: state.alerts.map((a) => (a.id === id ? { ...a, enabled: !a.enabled } : a)),
+    });
+
+    const { alertBackend } = await import('./alertBackend');
+    await alertBackend.toggle(id, !alert.enabled);
+    await refreshServerAlerts();
+  },
+
+  async remove(id: string) {
+    const state = useAlertStore.getState();
+    if (!state.serverMode) return state.removeAlert(id);
+
+    useAlertStore.setState({ alerts: state.alerts.filter((a) => a.id !== id) });
+    const { alertBackend } = await import('./alertBackend');
+    await alertBackend.remove(id);
+    await refreshServerAlerts();
+  },
+
+  async markEventsRead() {
+    const state = useAlertStore.getState();
+    state.markEventsRead();
+    if (!state.serverMode) return;
+    const { alertBackend } = await import('./alertBackend');
+    await alertBackend.markEventsRead();
+  },
+
+  async clearEvents() {
+    const state = useAlertStore.getState();
+    state.clearEvents();
+    if (!state.serverMode) return;
+    const { alertBackend } = await import('./alertBackend');
+    await alertBackend.clearEvents();
+  },
+};

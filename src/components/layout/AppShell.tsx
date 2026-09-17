@@ -7,6 +7,7 @@ import { startListingSync, stopListingSync } from '@/store/useListingStore';
 import { startAdminSync, stopAdminSync } from '@/store/useAdminStore';
 import { stopReviewSync } from '@/store/useReviewStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { syncAlertsWithAccount } from '@/store/useAlertStore';
 import { useAdminStore } from '@/store/useAdminStore';
 import { lockState } from '@/data/appLock';
 import { ComingSoon } from '@/pages/ComingSoon';
@@ -56,6 +57,17 @@ export function AppShell() {
       stopReviewSync();
     };
   }, []);
+
+  /* Alerts follow the session.
+
+     Signing in hands evaluation to the server, which checks every minute
+     whether or not anything is open; signing out gives it back to this tab.
+     Keyed on the id rather than the email so a re-login as the same person
+     does not needlessly reload. */
+  const userId = useAuthStore((s) => s.userId);
+  useEffect(() => {
+    void syncAlertsWithAccount(Boolean(userId));
+  }, [userId]);
 
   // ⌘K / Ctrl-K from anywhere, and `/` when not already typing.
   useEffect(() => {

@@ -85,6 +85,38 @@ describe('communityStrength', () => {
     expect(strength.commentCount).toBe(1);
   });
 
+  it('gives one person one vote, however often they post', () => {
+    // The daily limit lets somebody write about a token every day. If each
+    // post carried a fresh star, showing up daily would be a way to walk the
+    // score wherever you liked — so only the latest one votes.
+    const strength = communityStrength([
+      { ...review(5), userId: 'u', createdAt: 3 },
+      { ...review(5), userId: 'u', createdAt: 2 },
+      { ...review(5), userId: 'u', createdAt: 1 },
+    ]);
+    expect(strength.count).toBe(1);
+  });
+
+  it('votes with a person’s latest star, not their first', () => {
+    const strength = communityStrength([
+      { ...review(1), userId: 'u', createdAt: 2 },
+      { ...review(5), userId: 'u', createdAt: 1 },
+    ]);
+    expect(strength.average).toBe(1);
+    expect(strength.distribution).toEqual({ 1: 1, 2: 0, 3: 0, 4: 0, 5: 0 });
+  });
+
+  it('still counts every comment a person wrote', () => {
+    // One voice in the score, several entries in the conversation. Collapsing
+    // the comments too would quietly delete what somebody said yesterday.
+    const strength = communityStrength([
+      { ...review(4, 'still holding'), userId: 'u', createdAt: 2 },
+      { ...review(2, 'bought the dip'), userId: 'u', createdAt: 1 },
+    ]);
+    expect(strength.count).toBe(1);
+    expect(strength.commentCount).toBe(2);
+  });
+
   it('builds a distribution that adds up to the count', () => {
     const strength = communityStrength([review(5), review(5), review(2), review(1)]);
     expect(strength.distribution).toEqual({ 1: 1, 2: 1, 3: 0, 4: 0, 5: 2 });

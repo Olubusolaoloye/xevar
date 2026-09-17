@@ -6,6 +6,8 @@ import { formatPercent } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMarketStore } from '@/store/useMarketStore';
 import { reviewBackend, selectReviews, useReviewStore } from '@/store/useReviewStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { AuthForm } from '@/components/auth/AuthForm';
 import { Panel, PanelHeader } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -214,6 +216,8 @@ export function MultiChart() {
     selectReviews(right?.chain ?? '', right?.baseToken.address ?? ''),
   );
 
+  const signedIn = useAuthStore((s) => Boolean(s.userId && s.email));
+
   const spread = left && right ? left.change.h24 - right.change.h24 : null;
 
   return (
@@ -302,6 +306,31 @@ export function MultiChart() {
                     />
                   </Panel>
 
+                  {/* One sign-in for the page.
+
+                      Each panel below can ask for an account on its own, which
+                      is right on a token page where there is only one. Here
+                      there are two panels side by side, and two identical
+                      email-and-password forms on one screen read as two
+                      different accounts to make. So the panels are told to
+                      show the invitation without the form, and the form is
+                      rendered once, here. */}
+                  {!signedIn && (
+                    <Panel className="overflow-hidden">
+                      <PanelHeader
+                        title="Rate these tokens"
+                        subtitle="One account, both panels"
+                      />
+                      <div className="p-4">
+                        <AuthForm
+                          idPrefix="compare"
+                          signUpLabel="Create account"
+                          className="overflow-hidden"
+                        />
+                      </div>
+                    </Panel>
+                  )}
+
                   <div className="grid gap-4 lg:grid-cols-2">
                     {[left, right].map((pair) => (
                       <Panel key={pair.id} className="overflow-hidden">
@@ -319,7 +348,7 @@ export function MultiChart() {
                           }
                           subtitle="Ratings and comments"
                         />
-                        <CommunityPanel pair={pair} />
+                        <CommunityPanel pair={pair} showAuth={false} />
                       </Panel>
                     ))}
                   </div>
