@@ -35,13 +35,13 @@ export default defineConfig({
   },
 
   build: {
-    // Recharts and its d3 dependencies dominate the bundle; splitting them out
-    // keeps the app chunk small and lets the vendor chunk cache across deploys.
+    // The charting library is split out so it caches across deploys
+    // independently of the app chunk, which changes on every release.
     rollupOptions: {
       output: {
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['recharts'],
+          charts: ['lightweight-charts'],
         },
       },
     },
