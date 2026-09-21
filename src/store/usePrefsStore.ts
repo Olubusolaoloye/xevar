@@ -24,6 +24,9 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
  */
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
+/** Where the pair page's price chart comes from. */
+export type ChartSource = 'tradingview' | 'builtin';
+
 interface PrefsState {
   theme: ThemeChoice;
   currency: Currency;
@@ -40,6 +43,16 @@ interface PrefsState {
    * to make something go away. It is restorable from Settings.
    */
   curatedDismissed: boolean;
+  /**
+   * Which chart the pair page draws.
+   *
+   * TradingView by default: it fetches its own history, so it is immune to
+   * every way our own chart provider can fail. The built-in chart stays
+   * available because TradingView does not carry every micro-cap pool, and a
+   * symbol it has never heard of renders its notice, not ours.
+   */
+  chartSource: ChartSource;
+  setChartSource: (source: ChartSource) => void;
   setTheme: (theme: ThemeChoice) => void;
   setCurrency: (currency: Currency) => void;
   toggleRail: () => void;
@@ -55,6 +68,8 @@ export const usePrefsStore = create<PrefsState>()(
       railCollapsed: false,
       reduceFlash: false,
       curatedDismissed: false,
+      chartSource: 'tradingview',
+      setChartSource: (chartSource) => set({ chartSource }),
       setTheme: (theme) => set({ theme }),
       setCurrency: (currency) => set({ currency }),
       toggleRail: () => set((state) => ({ railCollapsed: !state.railCollapsed })),
