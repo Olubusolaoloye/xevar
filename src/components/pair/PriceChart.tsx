@@ -12,7 +12,7 @@ import { formatAxisPrice } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useChartTheme } from '@/hooks/useChartTheme';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import { usePairCandles } from '@/hooks/usePairChart';
+import { usePairCandles, type FailureReason } from '@/hooks/usePairChart';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { CandleInterval } from '@/data/sources/geckoterminal';
 import type { Pair } from '@/data/types';
@@ -38,6 +38,24 @@ const RANGE_SPEC: Record<Range, { interval: CandleInterval; bars: number }> = {
   '24h': { interval: 'h1', bars: 24 },
   '7d': { interval: 'h4', bars: 42 },
   all: { interval: 'd1', bars: 180 },
+};
+
+/**
+ * What to say when the chart has nothing to draw.
+ *
+ * One message for all three failures used to send people to check their wifi
+ * over a rate limit, and to wait indefinitely for a pool the provider has
+ * simply never indexed. Nothing is drawn in any of these cases — inventing a
+ * series is the one thing this app must never do — but the reason a reader is
+ * looking at an empty panel is worth being accurate about.
+ */
+const FAILURE_TEXT: Record<FailureReason, string> = {
+  unindexed:
+    'No chart for this pool. The price above is live, but the chart provider has not indexed this pool, so there is no history to draw.',
+  'rate-limited':
+    'Too many chart requests in the last minute. The provider allows about 30; this will come back on its own shortly.',
+  unreachable:
+    'Could not load price history. The chart provider is unreachable — nothing is drawn rather than guessed.',
 };
 
 /** Colour with an alpha channel appended, for the area gradient. */
@@ -98,7 +116,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
 
   const spec = RANGE_SPEC[range];
-  const { data: candles, loading, failed } = usePairCandles(pair, spec.interval);
+  const { data: candles, loading, failed, reason } = usePairCandles(pair, spec.interval);
 
   const data = useMemo(() => {
     return candles
@@ -241,9 +259,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
           <Skeleton className="h-full w-full" />
         ) : empty ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-low">
-            {failed
-              ? 'Could not load price history. The chart provider is unreachable — nothing is drawn rather than guessed.'
-              : 'No price history for this pool yet.'}
+            {failed ? FAILURE_TEXT[reason ?? 'unreachable'] : 'No price history for this pool yet.'}
           </div>
         ) : (
           <div

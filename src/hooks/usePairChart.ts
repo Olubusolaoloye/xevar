@@ -1,13 +1,35 @@
 import { useEffect, useState } from 'react';
 import { cached } from '@/data/cache';
+import { HttpError } from '@/data/http';
 import { fetchCandles, fetchTrades, type CandleInterval } from '@/data/sources/geckoterminal';
 import type { Candle, Pair, Trade } from '@/data/types';
+
+/**
+ * Why a request came back with nothing.
+ *
+ * These are not the same problem and must not read as though they were. A
+ * pool the provider has never indexed is a permanent fact about that pool; a
+ * rate limit clears in under a minute; an unreachable host is the user's own
+ * network as often as it is ours. Telling somebody "the provider is
+ * unreachable" when they have simply hit a 30-call limit sends them to check
+ * their wifi, and telling them the same thing about an unindexed pool sends
+ * them to wait for a recovery that will never come.
+ */
+export type FailureReason = 'unindexed' | 'rate-limited' | 'unreachable';
+
+function reasonFor(error: unknown): FailureReason {
+  if (error instanceof HttpError) {
+    if (error.status === 404) return 'unindexed';
+    if (error.isRateLimited) return 'rate-limited';
+  }
+  return 'unreachable';
+}
 
 interface AsyncResult<T> {
   data: T;
   loading: boolean;
   /**
-   * True when the provider could not be reached.
+   * True when the request produced nothing usable.
    *
    * The data is empty in that case. It used to be filled with a generated
    * series instead, which drew a plausible-looking chart of a market that
@@ -15,6 +37,8 @@ interface AsyncResult<T> {
    * that says why is the honest answer.
    */
   failed: boolean;
+  /** Which kind of failure, so the UI can say something true about it. */
+  reason: FailureReason | null;
 }
 
 /**
@@ -35,6 +59,7 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
     data: [],
     loading: true,
     failed: false,
+    reason: null,
   });
 
   useEffect(() => {
@@ -51,11 +76,11 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
         if (cancelled) return;
         // An empty response means the pool has no history on this provider;
         // that is a real answer, not a failure.
-        setState({ data: value, loading: false, failed: false });
+        setState({ data: value, loading: false, failed: false, reason: null });
       })
-      .catch(() => {
+      .catch((error) => {
         if (cancelled) return;
-        setState({ data: [], loading: false, failed: true });
+        setState({ data: [], loading: false, failed: true, reason: reasonFor(error) });
       });
 
     return () => {
@@ -77,6 +102,7 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
     data: [],
     loading: true,
     failed: false,
+    reason: null,
   });
 
   useEffect(() => {
@@ -90,10 +116,11 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
         { freshMs: refreshMs - 2_000, maxStaleMs: 5 * 60_000 },
       )
         .then(({ value }) => {
-          if (!cancelled) setState({ data: value, loading: false, failed: false });
+          if (!cancelled) setState({ data: value, loading: false, failed: false, reason: null });
         })
-        .catch(() => {
-          if (!cancelled) setState({ data: [], loading: false, failed: true });
+        .catch((error) => {
+          if (!cancelled)
+            setState({ data: [], loading: false, failed: true, reason: reasonFor(error) });
         });
     };
 
