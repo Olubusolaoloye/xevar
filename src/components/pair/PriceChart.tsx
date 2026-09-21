@@ -8,7 +8,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import { formatAxisPrice } from '@/lib/format';
+import { formatAge, formatAxisPrice } from '@/lib/format';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useChartTheme } from '@/hooks/useChartTheme';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -115,7 +115,13 @@ export function PriceChart({ pair }: { pair: Pair }) {
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
 
   const spec = RANGE_SPEC[range];
-  const { data: candles, loading, failed, reason } = usePairCandles(pair, spec.interval);
+  const {
+    data: candles,
+    loading,
+    failed,
+    reason,
+    cachedAgeMs,
+  } = usePairCandles(pair, spec.interval);
 
   const data = useMemo(() => {
     return candles
@@ -253,7 +259,16 @@ export function PriceChart({ pair }: { pair: Pair }) {
         />
       </div>
 
-      <div className="h-[300px] p-2 sm:h-[380px]">
+      <div className="relative h-[300px] p-2 sm:h-[380px]">
+        {cachedAgeMs !== null && !empty && (
+          /* Drawn from cache because the refresh failed. Labelled rather than
+             shown quietly: a stale series presented as current looks exactly
+             like a working chart, which is the one outcome worse than an
+             empty panel. */
+          <span className="pointer-events-none absolute right-4 top-3 z-10 rounded-sm border border-warn/25 bg-warn/10 px-2 py-0.5 text-[10px] text-warn">
+            Saved copy · {formatAge(Date.now() - cachedAgeMs)} old
+          </span>
+        )}
         {loading && empty ? (
           <Skeleton className="h-full w-full" />
         ) : empty ? (
