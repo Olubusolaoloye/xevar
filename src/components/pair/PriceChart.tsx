@@ -13,18 +13,11 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useChartTheme } from '@/hooks/useChartTheme';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { usePairCandles, type FailureReason } from '@/hooks/usePairChart';
-import { usePrefsStore, type ChartSource } from '@/store/usePrefsStore';
-import { TradingViewChart, tradingViewSymbol } from './TradingViewChart';
 import { Skeleton } from '@/components/ui/Skeleton';
 import type { CandleInterval } from '@/data/sources/geckoterminal';
 import type { Pair } from '@/data/types';
 
 type Range = '1h' | '6h' | '24h' | '7d' | 'all';
-
-const SOURCE_OPTIONS = [
-  { value: 'tradingview' as ChartSource, label: 'TradingView' },
-  { value: 'builtin' as ChartSource, label: 'Built-in' },
-];
 
 const RANGE_OPTIONS = [
   { value: '1h' as Range, label: '1H' },
@@ -110,8 +103,7 @@ function priceStep(values: number[]): { minMove: number; precision: number } {
  *
  * Built on Lightweight Charts rather than a general-purpose charting library:
  * it is purpose-built for price series, so the time axis handles irregular
- * gaps and the price scale handles sub-cent values without being taught how,
- * and it costs about a sixth of the bundle.
+ * gaps and the price scale handles sub-cent values without being taught how.
  */
 export function PriceChart({ pair }: { pair: Pair }) {
   const [range, setRange] = useState<Range>('24h');
@@ -122,33 +114,8 @@ export function PriceChart({ pair }: { pair: Pair }) {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
 
-  const chartSource = usePrefsStore((state) => state.chartSource);
-  const setChartSource = usePrefsStore((state) => state.setChartSource);
-
-  /* Set when TradingView's frame never loads — their host blocked, offline, or
-     an extension eating third-party frames. Kept in state rather than written
-     to the stored preference: the block may be this network or this session,
-     and permanently demoting TradingView for a device because of one bad
-     minute would be the wrong lesson to learn. */
-  const [frameFailed, setFrameFailed] = useState(false);
-
-  useEffect(() => setFrameFailed(false), [pair.id]);
-
-  // A listing with no resolvable pool address has no TradingView symbol, so
-  // the choice is not offered and the built-in chart is simply what runs.
-  const hasTradingView = tradingViewSymbol(pair) !== null;
-  const source: ChartSource =
-    hasTradingView && !frameFailed ? chartSource : 'builtin';
-
   const spec = RANGE_SPEC[range];
-  /* Passing undefined stands the fetch down entirely while TradingView owns
-     the panel. It is not just waste: our provider allows about 30 calls a
-     minute, and spending them on a series nobody is looking at is exactly how
-     the trade tape below ends up rate-limited. */
-  const { data: candles, loading, failed, reason } = usePairCandles(
-    source === 'builtin' ? pair : undefined,
-    spec.interval,
-  );
+  const { data: candles, loading, failed, reason } = usePairCandles(pair, spec.interval);
 
   const data = useMemo(() => {
     return candles
@@ -274,43 +241,20 @@ export function PriceChart({ pair }: { pair: Pair }) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-ink-low">
           Price
         </p>
-        <div className="flex items-center gap-2">
-          {/* TradingView ships its own range picker inside the frame, so ours
-              would be a second control that does nothing to it. */}
-          {source === 'builtin' && (
-            <SegmentedControl<Range>
-              options={RANGE_OPTIONS}
-              value={range}
-              onChange={setRange}
-              size="sm"
-            />
-          )}
-          {hasTradingView && (
-            <SegmentedControl<ChartSource>
-              options={SOURCE_OPTIONS}
-              value={source}
-              onChange={setChartSource}
-              size="sm"
-            />
-          )}
-        </div>
+        <SegmentedControl<Range>
+          options={RANGE_OPTIONS}
+          value={range}
+          onChange={setRange}
+          size="sm"
+        />
       </div>
 
-      <div className="relative h-[300px] p-2 sm:h-[380px]">
-        {source === 'builtin' && !empty && (
-          /* Credited the way every other screener credits it. The figures are
-             someone else's work and the reader deserves to know whose. */
-          <span className="pointer-events-none absolute bottom-3 right-4 z-10 text-[10px] text-ink-dim">
-            via GeckoTerminal
-          </span>
-        )}
-        {source === 'tradingview' ? (
-          <TradingViewChart pair={pair} onUnavailable={() => setFrameFailed(true)} />
-        ) : loading && empty ? (
+      <div className="h-[300px] p-2 sm:h-[380px]">
+        {loading && empty ? (
           <Skeleton className="h-full w-full" />
         ) : empty ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-xs text-ink-low">

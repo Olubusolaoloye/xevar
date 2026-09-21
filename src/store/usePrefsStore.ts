@@ -24,9 +24,6 @@ export const CURRENCY_SYMBOL: Record<Currency, string> = {
  */
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
-/** Where the pair page's price chart comes from. */
-export type ChartSource = 'tradingview' | 'builtin';
-
 interface PrefsState {
   theme: ThemeChoice;
   currency: Currency;
@@ -43,21 +40,6 @@ interface PrefsState {
    * to make something go away. It is restorable from Settings.
    */
   curatedDismissed: boolean;
-  /**
-   * Which chart the pair page draws.
-   *
-   * The built-in one by default. It is the same stack the screeners people
-   * compare us to use — TradingView's Lightweight Charts over GeckoTerminal
-   * data — and now that the pool is resolved from the chart provider itself
-   * rather than inherited from the price provider, it is the more reliable of
-   * the two: GeckoTerminal is asked which pool it has, where a TradingView
-   * symbol has to be derived and hope.
-   *
-   * The embedded TradingView chart stays available for anyone who prefers its
-   * toolbar and indicators.
-   */
-  chartSource: ChartSource;
-  setChartSource: (source: ChartSource) => void;
   setTheme: (theme: ThemeChoice) => void;
   setCurrency: (currency: Currency) => void;
   toggleRail: () => void;
@@ -73,8 +55,6 @@ export const usePrefsStore = create<PrefsState>()(
       railCollapsed: false,
       reduceFlash: false,
       curatedDismissed: false,
-      chartSource: 'builtin',
-      setChartSource: (chartSource) => set({ chartSource }),
       setTheme: (theme) => set({ theme }),
       setCurrency: (currency) => set({ currency }),
       toggleRail: () => set((state) => ({ railCollapsed: !state.railCollapsed })),

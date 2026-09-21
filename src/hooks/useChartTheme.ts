@@ -18,19 +18,9 @@ export interface ChartTheme {
   border: string;
   up: string;
   down: string;
-  /**
-   * Which palette is actually in force, resolved.
-   *
-   * Not the user's `ThemeChoice` — that can be "system", which is an
-   * instruction rather than an answer. An embedded third-party chart has to be
-   * told "light" or "dark", so the resolution happens here, once.
-   */
-  mode: 'light' | 'dark';
 }
 
-type ColorKey = Exclude<keyof ChartTheme, 'mode'>;
-
-const TOKENS: Record<ColorKey, string> = {
+const TOKENS: Record<keyof ChartTheme, string> = {
   text: '--color-ink-dim',
   grid: '--grid-line',
   crosshair: '--color-ink-low',
@@ -51,22 +41,11 @@ function readTheme(): ChartTheme {
       border: '#332c22',
       up: '#1dbf63',
       down: '#e03540',
-      mode: 'dark',
     };
   }
 
   const styles = getComputedStyle(document.documentElement);
   const read = (token: string) => styles.getPropertyValue(token).trim();
-
-  // The stamped attribute wins when present; otherwise "system" is in force
-  // and the OS preference is the answer.
-  const stamped = document.documentElement.getAttribute('data-theme');
-  const mode: 'light' | 'dark' =
-    stamped === 'light' || stamped === 'dark'
-      ? stamped
-      : window.matchMedia('(prefers-color-scheme: light)').matches
-        ? 'light'
-        : 'dark';
 
   return {
     text: read(TOKENS.text),
@@ -75,7 +54,6 @@ function readTheme(): ChartTheme {
     border: read(TOKENS.border),
     up: read(TOKENS.up),
     down: read(TOKENS.down),
-    mode,
   };
 }
 
