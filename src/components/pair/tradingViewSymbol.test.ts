@@ -12,15 +12,23 @@ function pair(over: Partial<Pair> = {}): Pair {
 }
 
 describe('tradingViewSymbol', () => {
-  it('builds base+quote plus the first six hex of the pool', () => {
-    // TradingView's own naming: CAKEBUSD_804678 is the pool at 0x804678fa…
-    expect(tradingViewSymbol(pair())).toBe('WKCWBNB_804678');
+  it('builds base+quote plus the first six hex of the pool, in USD', () => {
+    // TradingView's own naming: WKC/WBNB at 0x933477eb… is WKCWBNB_933477.USD
+    expect(
+      tradingViewSymbol(pair({ pairAddress: '0x933477eba23726cA95A957cB85dBB1957267EF85' })),
+    ).toBe('WKCWBNB_933477.USD');
+  });
+
+  it('keeps the .USD suffix, so the chart is not priced in the quote asset', () => {
+    // Without it the same pool charts in WBNB while every other figure on the
+    // page is in dollars — two different numbers for one price.
+    expect(tradingViewSymbol(pair())).toMatch(/\.USD$/);
   });
 
   it('upper-cases the address fragment, which arrives mixed-case', () => {
     expect(
       tradingViewSymbol(pair({ pairAddress: '0xf6dcdce0ac3001B2f67F750bc64ea5beB37B5824' })),
-    ).toBe('WKCWBNB_F6DCDC');
+    ).toBe('WKCWBNB_F6DCDC.USD');
   });
 
   it('refuses a malformed address rather than guessing a symbol', () => {
@@ -36,7 +44,7 @@ describe('tradingViewSymbol', () => {
       tradingViewSymbol(
         pair({ baseToken: { address: '0xb', name: 'Dog', symbol: '$DTG-v2' } }),
       ),
-    ).toBe('DTGV2WBNB_804678');
+    ).toBe('DTGV2WBNB_804678.USD');
   });
 
   it('refuses when a ticker is punctuation only', () => {

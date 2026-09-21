@@ -9,10 +9,19 @@ const WIDGET_SRC =
  * TradingView's symbol for an on-chain pool.
  *
  * Their DEX pairs are named `{BASE}{QUOTE}_{first six hex of the pool
- * address}`, upper-cased — `CAKEBUSD_804678` is the CAKE/BUSD pool at
- * 0x804678fa…, and `HEXUSDC_F6DCDC` is the HEX/USDC pool at 0xF6DCdce0…. That
- * makes the symbol derivable from what a listing already carries, with no
+ * address}`, upper-cased, with a `.USD` suffix for the dollar-denominated
+ * series — WKC/WBNB on PancakeSwap at 0x933477eb… is `WKCWBNB_933477.USD`.
+ * That makes the symbol derivable from what a listing already carries, with no
  * lookup and no second data source to keep in step.
+ *
+ * The suffix is not decoration. Without it the symbol is the same pool priced
+ * in the quote asset, so a token would be charted in WBNB while every other
+ * figure on the page is in dollars — two different numbers for one price,
+ * which is exactly the confusion this board exists to avoid.
+ *
+ * The exchange prefix (`PANCAKESWAP:`) is deliberately omitted: it would have
+ * to be mapped from the provider's DEX name, which varies by version and
+ * spelling, and TradingView resolves the bare symbol on its own.
  *
  * Null when the pool address is missing or malformed, because a guessed symbol
  * resolves to somebody else's market — the one failure mode worse than showing
@@ -26,7 +35,7 @@ export function tradingViewSymbol(pair: Pair): string | null {
   const quote = pair.quoteToken.symbol.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (!base || !quote) return null;
 
-  return `${base}${quote}_${address.slice(2, 8).toUpperCase()}`;
+  return `${base}${quote}_${address.slice(2, 8).toUpperCase()}.USD`;
 }
 
 /**
