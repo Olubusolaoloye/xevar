@@ -65,6 +65,14 @@ interface AsyncResult<T> {
   failed: boolean;
   /** Which kind of failure, so the UI can say something true about it. */
   reason: FailureReason | null;
+  /**
+   * Age of the data, when it came from cache because the refresh failed.
+   *
+   * Null when the value is live. A chart drawn from cache must say so — a
+   * stale series presented as current is the one thing worse than an empty
+   * panel, because it looks exactly like a working chart.
+   */
+  cachedAgeMs: number | null;
 }
 
 /**
@@ -86,6 +94,7 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
     loading: true,
     failed: false,
     reason: null,
+    cachedAgeMs: null,
   });
 
   useEffect(() => {
@@ -101,17 +110,36 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
           await chartPool(pair.chain, pair.baseToken.address, pair.pairAddress),
           interval,
         ),
-      { freshMs: 60_000, maxStaleMs: 15 * 60_000 },
+      {
+        freshMs: 60_000,
+        // A day, now that the cache survives reloads. Beyond that the series
+        // is kept on disk but not offered: a day-old shape is context, a
+        // week-old one is a different market.
+        maxStaleMs: 24 * 60 * 60_000,
+        persist: true,
+      },
     )
-      .then(({ value }) => {
+      .then(({ value, stale, ageMs }) => {
         if (cancelled) return;
         // An empty response means the pool has no history on this provider;
         // that is a real answer, not a failure.
-        setState({ data: value, loading: false, failed: false, reason: null });
+        setState({
+          data: value,
+          loading: false,
+          failed: false,
+          reason: null,
+          cachedAgeMs: stale ? ageMs : null,
+        });
       })
       .catch((error) => {
         if (cancelled) return;
-        setState({ data: [], loading: false, failed: true, reason: reasonFor(error) });
+        setState({
+          data: [],
+          loading: false,
+          failed: true,
+          reason: reasonFor(error),
+          cachedAgeMs: null,
+        });
       });
 
     return () => {
@@ -134,6 +162,7 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
     loading: true,
     failed: false,
     reason: null,
+    cachedAgeMs: null,
   });
 
   useEffect(() => {
@@ -151,11 +180,18 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
         { freshMs: refreshMs - 2_000, maxStaleMs: 5 * 60_000 },
       )
         .then(({ value }) => {
-          if (!cancelled) setState({ data: value, loading: false, failed: false, reason: null });
+          if (!cancelled)
+            setState({ data: value, loading: false, failed: false, reason: null, cachedAgeMs: null });
         })
         .catch((error) => {
           if (!cancelled)
-            setState({ data: [], loading: false, failed: true, reason: reasonFor(error) });
+            setState({
+              data: [],
+              loading: false,
+              failed: true,
+              reason: reasonFor(error),
+              cachedAgeMs: null,
+            });
         });
     };
 
