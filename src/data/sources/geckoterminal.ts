@@ -169,6 +169,47 @@ export async function fetchTrades(
    Re-adding this needs a provider whose number can actually be checked against
    an explorer, which in practice means a keyed API. */
 
+interface PoolsResponse {
+  data?: Array<{ attributes?: { address?: string; reserve_in_usd?: string } }>;
+}
+
+/**
+ * The pool this provider can actually chart for a token.
+ *
+ * This exists because the board and the chart come from two different indexes
+ * that do not agree. DexScreener picks the deepest pool it knows about and
+ * that address is what a listing pins; GeckoTerminal indexes its own set. When
+ * the two disagree — which for a small token is often — asking here for
+ * DexScreener's pool returns 404, and the chart panel goes empty on a token
+ * whose price is updating perfectly well two inches above it.
+ *
+ * So the chart stops assuming and asks. This is the same thing other screeners
+ * do: chart the pool the chart provider has, not the one the price came from.
+ *
+ * Returns null when the token is unknown here, which lets the caller fall back
+ * to the pinned pool rather than losing the chart entirely.
+ */
+export async function fetchTopPool(
+  chain: ChainId,
+  tokenAddress: string,
+): Promise<string | null> {
+  const url = `${BASE}/networks/${NETWORK[chain]}/tokens/${tokenAddress}/pools`;
+  const response = await getJson<PoolsResponse>(url);
+
+  // Sorted by liquidity by the provider, but sorted again here rather than
+  // trusting the order: the deepest pool is the one whose candles are least
+  // likely to be a single trade a day.
+  const pools = (response.data ?? [])
+    .map((entry) => ({
+      address: entry.attributes?.address ?? '',
+      reserve: Number.parseFloat(entry.attributes?.reserve_in_usd ?? '0') || 0,
+    }))
+    .filter((pool) => pool.address);
+
+  if (pools.length === 0) return null;
+  return pools.reduce((best, pool) => (pool.reserve > best.reserve ? pool : best)).address;
+}
+
 /** Whether a chain is covered by this provider. */
 export function supportsChain(chain: ChainId): boolean {
   return chain in NETWORK;
