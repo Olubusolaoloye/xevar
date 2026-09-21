@@ -46,10 +46,15 @@ interface PrefsState {
   /**
    * Which chart the pair page draws.
    *
-   * TradingView by default: it fetches its own history, so it is immune to
-   * every way our own chart provider can fail. The built-in chart stays
-   * available because TradingView does not carry every micro-cap pool, and a
-   * symbol it has never heard of renders its notice, not ours.
+   * The built-in one by default. It is the same stack the screeners people
+   * compare us to use — TradingView's Lightweight Charts over GeckoTerminal
+   * data — and now that the pool is resolved from the chart provider itself
+   * rather than inherited from the price provider, it is the more reliable of
+   * the two: GeckoTerminal is asked which pool it has, where a TradingView
+   * symbol has to be derived and hope.
+   *
+   * The embedded TradingView chart stays available for anyone who prefers its
+   * toolbar and indicators.
    */
   chartSource: ChartSource;
   setChartSource: (source: ChartSource) => void;
@@ -68,7 +73,7 @@ export const usePrefsStore = create<PrefsState>()(
       railCollapsed: false,
       reduceFlash: false,
       curatedDismissed: false,
-      chartSource: 'tradingview',
+      chartSource: 'builtin',
       setChartSource: (chartSource) => set({ chartSource }),
       setTheme: (theme) => set({ theme }),
       setCurrency: (currency) => set({ currency }),

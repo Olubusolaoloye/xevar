@@ -300,7 +300,14 @@ export function PriceChart({ pair }: { pair: Pair }) {
         </div>
       </div>
 
-      <div className="h-[300px] p-2 sm:h-[380px]">
+      <div className="relative h-[300px] p-2 sm:h-[380px]">
+        {source === 'builtin' && !empty && (
+          /* Credited the way every other screener credits it. The figures are
+             someone else's work and the reader deserves to know whose. */
+          <span className="pointer-events-none absolute bottom-3 right-4 z-10 text-[10px] text-ink-dim">
+            via GeckoTerminal
+          </span>
+        )}
         {source === 'tradingview' ? (
           <TradingViewChart pair={pair} onUnavailable={() => setFrameFailed(true)} />
         ) : loading && empty ? (

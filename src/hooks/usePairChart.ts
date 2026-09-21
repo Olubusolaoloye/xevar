@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { cached } from '@/data/cache';
 import { HttpError } from '@/data/http';
-import { fetchCandles, fetchTrades, type CandleInterval } from '@/data/sources/geckoterminal';
+import {
+  fetchCandles,
+  fetchTopPool,
+  fetchTrades,
+  type CandleInterval,
+} from '@/data/sources/geckoterminal';
 import type { Candle, Pair, Trade } from '@/data/types';
 
 /**
@@ -23,6 +28,27 @@ function reasonFor(error: unknown): FailureReason {
     if (error.isRateLimited) return 'rate-limited';
   }
   return 'unreachable';
+}
+
+/**
+ * The pool this provider will chart, resolved once per token.
+ *
+ * Falls back to whatever the listing pinned. That address came from a
+ * different index and may not exist here — but a 404 the caller can report is
+ * better than refusing to try, and for the many tokens where the two indexes
+ * do agree it is exactly right.
+ *
+ * Cached for an hour: which pool is deepest changes on the timescale of days,
+ * and this provider allows about thirty calls a minute across the whole app.
+ */
+function chartPool(chain: string, tokenAddress: string, pinned: string): Promise<string> {
+  return cached(
+    `pool:${chain}:${tokenAddress.toLowerCase()}`,
+    async () => (await fetchTopPool(chain as never, tokenAddress)) ?? pinned,
+    { freshMs: 60 * 60_000, maxStaleMs: 24 * 60 * 60_000 },
+  )
+    .then(({ value }) => value)
+    .catch(() => pinned);
 }
 
 interface AsyncResult<T> {
@@ -69,7 +95,12 @@ export function usePairCandles(pair: Pair | undefined, interval: CandleInterval)
 
     cached(
       `candles:${pair.id}:${interval}`,
-      () => fetchCandles(pair.chain, pair.pairAddress, interval),
+      async () =>
+        fetchCandles(
+          pair.chain,
+          await chartPool(pair.chain, pair.baseToken.address, pair.pairAddress),
+          interval,
+        ),
       { freshMs: 60_000, maxStaleMs: 15 * 60_000 },
     )
       .then(({ value }) => {
@@ -112,7 +143,11 @@ export function usePairTrades(pair: Pair | undefined, refreshMs = 20_000) {
     const load = () => {
       cached(
         `trades:${pair.id}`,
-        () => fetchTrades(pair.chain, pair.pairAddress),
+        async () =>
+          fetchTrades(
+            pair.chain,
+            await chartPool(pair.chain, pair.baseToken.address, pair.pairAddress),
+          ),
         { freshMs: refreshMs - 2_000, maxStaleMs: 5 * 60_000 },
       )
         .then(({ value }) => {
