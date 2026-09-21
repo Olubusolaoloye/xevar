@@ -125,10 +125,20 @@ export function PriceChart({ pair }: { pair: Pair }) {
   const chartSource = usePrefsStore((state) => state.chartSource);
   const setChartSource = usePrefsStore((state) => state.setChartSource);
 
+  /* Set when TradingView's frame never loads — their host blocked, offline, or
+     an extension eating third-party frames. Kept in state rather than written
+     to the stored preference: the block may be this network or this session,
+     and permanently demoting TradingView for a device because of one bad
+     minute would be the wrong lesson to learn. */
+  const [frameFailed, setFrameFailed] = useState(false);
+
+  useEffect(() => setFrameFailed(false), [pair.id]);
+
   // A listing with no resolvable pool address has no TradingView symbol, so
   // the choice is not offered and the built-in chart is simply what runs.
   const hasTradingView = tradingViewSymbol(pair) !== null;
-  const source: ChartSource = hasTradingView ? chartSource : 'builtin';
+  const source: ChartSource =
+    hasTradingView && !frameFailed ? chartSource : 'builtin';
 
   const spec = RANGE_SPEC[range];
   /* Passing undefined stands the fetch down entirely while TradingView owns
@@ -292,7 +302,7 @@ export function PriceChart({ pair }: { pair: Pair }) {
 
       <div className="h-[300px] p-2 sm:h-[380px]">
         {source === 'tradingview' ? (
-          <TradingViewChart pair={pair} />
+          <TradingViewChart pair={pair} onUnavailable={() => setFrameFailed(true)} />
         ) : loading && empty ? (
           <Skeleton className="h-full w-full" />
         ) : empty ? (
