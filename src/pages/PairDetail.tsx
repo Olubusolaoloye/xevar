@@ -35,6 +35,7 @@ import { TradeTape } from '@/components/pair/TradeTape';
 import { SecurityPanel } from '@/components/pair/SecurityPanel';
 import { VerdictPanel } from '@/components/pair/VerdictPanel';
 import { PnlCard } from '@/components/pair/PnlCard';
+import { AlertCard } from '@/components/pair/AlertCard';
 import { ProfitCalculator } from '@/components/pair/ProfitCalculator';
 import { ShareCards } from '@/components/pair/ShareCards';
 import { CommunityPanel } from '@/components/compare/CommunityPanel';
@@ -443,6 +444,10 @@ export function PairDetail() {
                 </span>
               </div>
             </div>
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <AlertCard pair={pair} />
           </Panel>
 
           <Panel className="overflow-hidden" elevation="raised">
